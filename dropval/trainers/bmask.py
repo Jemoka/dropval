@@ -188,8 +188,8 @@ class BMaskTrainer:
         L.info(f"VAL | DONE | edit success {round(es, 3)} | edit succes (unrelated) {round(es_loc, 3)}")
 
         logs = {
-            "val/edit_success": es,
-            "val/edit_localization": es_loc,
+            "bmask/val/edit_success": es,
+            "bmask/val/edit_localization": es_loc,
         }
 
         self.train()
@@ -252,7 +252,7 @@ class BMaskTrainer:
                     self.save(self.save_dir / "best")
 
             if indx % 16 == 0:
-                self.accelerator.log({"training/loss": step}, step=self.global_step_counter_)
+                self.accelerator.log({"bmask/training/loss": step}, step=self.global_step_counter_)
                 L.info(f"TRAIN | {indx}/{len(self.train_dl)} | loss {round(step, 3)}")
 
             self.global_step_counter_ += 1

@@ -176,9 +176,9 @@ class MENDTrainer:
         L.info(f"VAL | DONE | edit success {round(es, 3)} | edit success localization {round(esp, 3)} | target prob diff {round(tbp, 3)}")
 
         logs = {
-            "val/edit_success": es,
-            "val/edit_success_localization": esp,
-            "val/target_prob_diff": tbp,
+            "mend/val/edit_success": es,
+            "mend/val/edit_success_localization": esp,
+            "mend/val/target_prob_diff": tbp,
         }
 
         self.train()
@@ -246,7 +246,7 @@ class MENDTrainer:
                 
 
             if indx % 16 == 0:
-                self.accelerator.log({"training/loss": step}, step=self.global_step_counter_)
+                self.accelerator.log({"mend/training/loss": step}, step=self.global_step_counter_)
                 L.info(f"TRAIN | {indx}/{len(self.train_dl)} | loss {round(step, 3)}")
 
             self.global_step_counter_ += 1

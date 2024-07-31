@@ -97,7 +97,7 @@ class SquadTrainer:
                 # we can do this because we are not training more than
                 # one epoch
                 val = self.val()
-                loss = val["val_f1"]+val["val_exact"]
+                loss = val["squad/val/f1"]+val["squad/val/exact"]
 
                 if loss < self.best_val_score_:
                     self.best_val_score_ = loss
@@ -105,7 +105,7 @@ class SquadTrainer:
 
                 self.save(self.save_dir)
                 self.accelerator.log(val, step=self.global_step_counter_)
-                L.info(f"VAL | exact match {round(val['val_exact'], 3)} | f1 {round(val['val_f1'], 3)}",
+                L.info(f"VAL | exact match {round(val['val_exact'], 3)} | f1 {round(val['val/f1'], 3)}",
                        main_process_only=True)
 
 
@@ -120,8 +120,8 @@ class SquadTrainer:
                 loss = self.accelerator.gather(outputs.loss).mean().cpu().item()
 
                 L.info(f"TRAIN | batch {indx} | loss {round(loss, 3)}", main_process_only=True)
-                self.accelerator.log({"training/loss": loss,
-                                      "training/lr": self.optim.param_groups[0]["lr"]},
+                self.accelerator.log({"squad/training/loss": loss,
+                                      "squad/training/lr": self.optim.param_groups[0]["lr"]},
                                      step=self.global_step_counter_)
 
             self.global_step_counter_ += 1

@@ -143,7 +143,7 @@ def compute_metrics(start_logits, end_logits, features, examples):
     theoretical_answers = [{ "id": ex["id"], "answers": ex["answers"]} for ex in examples]
 
     return {
-        f"val_{k}": v
+        f"squad/val/{k}": v
         for k,v in
         metric.compute(predictions=predicted_answers, references=theoretical_answers).items()
     }
