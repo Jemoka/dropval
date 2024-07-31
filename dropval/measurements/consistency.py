@@ -29,16 +29,9 @@ np.random.seed(0)
 
 
 class Consistency:
-    def __init__(self, args, model, tokenizer):
-        self.accelerator = Accelerator(log_with="wandb")
-        self.accelerator.init_trackers(
-            project_name="dropval", 
-            config=vars(args),
-            init_kwargs={"wandb": {"entity": "jemoka",
-                                   "mode": None if args.wandb else "disabled"}},
-        )
+    def __init__(self, args, accelerator, model, tokenizer):
+        self.accelerator = accelerator
 
-        mask_tok = tokenizer.mask_token
         df = pd.read_csv(args.dataset)
 
         class PararelConsistencyDataset(Dataset):
@@ -54,11 +47,12 @@ class Consistency:
         ds = PararelConsistencyDataset(df)
         self.dl = DataLoader(ds, batch_size=args.batch_size, shuffle=False)
 
-        self.dl = self.accelerator.preapre(self.dl)
+        self.dl = self.accelerator.prepare(self.dl)
         self.model = model.to(self.device)
         self.tokenizer = tokenizer
 
-        self.__out_file = Path(args.out_path) / "consistency.csv"
+        self.__out_file = args.out_dir / args.results_dir / "consistency.csv"
+        (args.out_dir / args.results_dir).mkdir(parents=True, exist_ok=True)
 
     @property
     def device(self):
@@ -66,6 +60,9 @@ class Consistency:
 
     def __call__():
         final = defaultdict(list)
+
+        mask_tok_str = self.tokenizer.mask_token
+        mask_tok = self.tokenizer.mask_token_id
 
         for indx, i in tqdm(enumerate(iter(self.dl)), total=len(self.dl)):
             tok = self.tokenizer([j.replace("[MASK]", mask_tok_str) for j in i["probe"]], return_tensors="pt", padding=True)

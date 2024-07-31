@@ -9,7 +9,7 @@ import wandb
 from torch.optim import Adam 
 import torch.nn.functional as F
 
-from data import hydrate_bmask
+from dropval.trainers.utils.medit import hydrate_bmask
 
 import os
 from torch.utils.data.dataloader import DataLoader, Dataset
@@ -28,29 +28,25 @@ from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
 
 
-class BMask:
-    def __init__(self, args, model, tokenizer):
-        self.save_dir = Path(args.output)
-        self.save_dir.mkdir(parents=True, exist_ok=True)
+class BMaskTrainer:
+    def __init__(self, args, accelerator, model, tokenizer, concept=None):
+        assert concept "Please supply a concept!" # possible through API to accidentally not
+                                                  # but concept must be optional to maintain call signature
 
         self.args = args
-        generator, concepts = hydrate_bmask(args.dataset, args.val_split)
-        assert args.concept in concepts, "Please supply valid --concept that corresponds to concept in DF."
+        generator, concepts = hydrate_bmask(args.data_dir / "paratrace.csv", args.val_split)
+        assert concept in concepts, "Please supply valid concept that corresponds to concept in DF."
 
-        train, v1, v2 = generator(args.concept)
+        self.save_dir = args.out_dir / args.intermediate_dir / f"bmask_{args.concept}"
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+
+        train, v1, v2 = generator(concept)
 
         self.train_dl = DataLoader(train, args.batch_size, shuffle=True)
         self.val_dl_1 = DataLoader(v1, args.batch_size, shuffle=True)
         self.val_dl_2 = DataLoader(v2, args.batch_size, shuffle=True)
 
-        self.accelerator = Accelerator(log_with="wandb")
-        self.accelerator.init_trackers(
-            project_name="dropval", 
-            config=vars(args),
-            init_kwargs={"wandb": {"entity": "jemoka",
-                                   "mode": None if args.wandb else "disabled"}},
-        )
-
+        self.accelerator = accelerator
         self.model = model
         set_requires_grad(False, self.model)
 
@@ -65,6 +61,13 @@ class BMask:
 
         # to build optimizers, etc.
         self.__compiled = False
+
+    @staticmethod
+    def concepts(args):
+        generator, concepts = hydrate_bmask(args.data_dir / "paratrace.csv", args.val_split)
+
+        return concepts
+
 
     def compile(self):
         """compile the mender, meaning we can't change targets, etc.

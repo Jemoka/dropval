@@ -17,9 +17,9 @@ from torch.optim.lr_scheduler import SequentialLR, LinearLR
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 
-from dropval.measurements.utils.squad import hydrate_preprocessor, compute_metrics
+from dropval.trainers.utils.squad import hydrate_preprocessor, compute_metrics
 
-L = get_logger("mbench", log_level="DEBUG")
+L = get_logger("dropval", log_level="DEBUG")
 
 import tempfile
 
@@ -28,21 +28,20 @@ from argparse import Namespace
 from torch.utils.data import IterableDataset
 from transformers import default_data_collator
 
-class Trainer:
-    def __init__(self, config):
+class SquadTrainer:
+    def __init__(self, config, accelerator, model, tokenizer):
+        save_dir = config.out_dir / config.intermediate_dir / "squad"
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        self.save_dir = str(save_dir / "checkpoint")
+        self.best_dir = str(save_dir / "best")
+
         self.config = config
 
-        self.accelerator = Accelerator(log_with="wandb")
-        self.accelerator.init_trackers(
-            project_name="mbench", 
-            config=vars(config),
-            init_kwargs={"wandb": {"entity": "jemoka",
-                                   "mode": None if config.wandb else "disabled",
-                                   "name": config.experiment}},
-        )
+        self.accelerator = accelerator
 
-        self.tokenizer = AutoTokenizer.from_pretrained(config.base)
-        self.model = AutoModelForQuestionAnswering.from_pretrained(config.base)
+        self.model = model
+        self.tokenizer = tokenizer
         self.model.train()
 
         dataset = load_dataset("squad_v2")
@@ -67,8 +66,6 @@ class Trainer:
                                  batch_size=config.batch_size)
 
 
-        self.model = AutoModelForQuestionAnswering.from_pretrained(config.base)
-        self.tokenizer = AutoTokenizer.from_pretrained(config.base)
         self.optim = AdamW(self.model.parameters(), lr=config.lr,
                            betas=(0.9,0.999), eps=1e-6, weight_decay=0.01)
 
@@ -81,8 +78,6 @@ class Trainer:
         self.global_step_counter_ = 0
         self.best_val_score_ = float("+inf")
 
-        self.save_dir = os.path.join(config.save_dir, config.experiment, "checkpoint")
-        self.best_dir = os.path.join(config.save_dir, config.experiment, "best")
         (self.model, self.optim, self.train_dl, self.val_dl, self.scheduler) = self.accelerator.prepare(
             self.model, self.optim, self.train_dl, self.val_dl, self.scheduler)
 
@@ -132,6 +127,19 @@ class Trainer:
             self.global_step_counter_ += 1
 
     def finish():
+        # and write results
+        args = self.config
+        (args.out_dir / args.results_dir).mkdir(parents=True, exist_ok=True)
+        out_path = args.out_dir / args.results_dir / "squad.json"
+
+        # load best dir and calculate final results
+        self.load(self.best_dir)
+        results = self.val()
+
+        # write to file
+        with open(out_path, 'w') as df:
+            json.dump(results, df)
+
         self.accelerator.end_training()
 
     def val(self):

@@ -11,7 +11,7 @@ import wandb
 from torch.optim import Adam 
 import torch.nn.functional as F
 
-from data import hydrate_mend
+from dropval.trainers.utils.medit import hydrate_mend
 
 import os
 from torch.utils.data.dataloader import DataLoader, Dataset
@@ -29,24 +29,18 @@ from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
 
 
-class MENDer:
-    def __init__(self, args, model, tokenizer):
-        self.save_dir = Path(args.output)
+class MENDTrainer:
+    def __init__(self, args, accelerator, model, tokenizer):
+        self.save_dir = args.out_dir / args.intermediate_dir / "mend"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         self.args = args
-        train_ds, val_ds = hydrate_mend(args.dataset, args.val_split)
+        train_ds, val_ds = hydrate_mend(args.data_dir / "paratrace.csv", args.val_split)
 
         self.train_dl = DataLoader(train_ds, args.batch_size, shuffle=True)
         self.val_dl = DataLoader(val_ds, args.batch_size, shuffle=True)
 
-        self.accelerator = Accelerator(log_with="wandb")
-        self.accelerator.init_trackers(
-            project_name="dropval", 
-            config=vars(args),
-            init_kwargs={"wandb": {"entity": "jemoka",
-                                   "mode": None if args.wandb else "disabled"}},
-        )
+        self.accelerator = accelerator
 
         self.model = model
         set_requires_grad(False, self.model)
