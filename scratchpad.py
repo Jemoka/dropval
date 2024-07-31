@@ -33,8 +33,10 @@ args.out_dir = actual_out_dir
 # hydrate data dir
 args.data_dir = Path(args.data_dir)
 
-accelerator = get_accelerator(args)
 model, tokenizer, config = load_base(args)
+args.__dict__["model_config"] = config
+
+accelerator = get_accelerator(args)
 
 model
 tokenizer

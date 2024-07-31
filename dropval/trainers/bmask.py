@@ -62,12 +62,14 @@ class BMaskTrainer:
         # to build optimizers, etc.
         self.__compiled = False
 
+        self.push(*args.model_config["bmask_layers"])
+        self.compile()
+
     @staticmethod
     def concepts(args):
         generator, concepts = hydrate_bmask(args.data_dir / "paratrace.csv", args.val_split)
 
         return concepts
-
 
     def compile(self):
         """compile the mender, meaning we can't change targets, etc.

@@ -57,6 +57,10 @@ class MENDTrainer:
         # to build optimizers, etc.
         self.__compiled = False
 
+        [self.push(*i) for i in args.model_config["mend_layers"]]
+        self.compile()
+
+
     def compile(self):
         """compile the mender, meaning we can't change targets, etc.
         after this is done."""
@@ -132,34 +136,48 @@ class MENDTrainer:
     def val(self):
         self.eval()
         edit_successes = torch.tensor([]).to(self.device)
+        edit_successes_p = torch.tensor([]).to(self.device)
         target_prob_diffes = torch.tensor([]).to(self.device)
 
         for indx, i in enumerate(iter(self.val_dl)):
             if indx % 100 == 0:
                 L.info(f"VAL | {indx}/{len(self.val_dl)}")
+
             xs = i["xs"]
             ys = i["ys"]
-
             ((res, res_alt), (target_prob, target_alt_prob),
             (argmax_idx, argmax_alt_idx),
             target) = self(xs, ys)
 
+            xs = i["xs"]
+            ys = i["ys"]
+            xp = i["xloc"]
+            yp = i["yloc"]
+            ((resp, resp_alt), __, ___, ____) = self(xs, ys, xp, yp)
+
             tokenized = self.tokenizer(ys, return_tensors="pt", padding=True).to(self.device)
+            tokenized_p = self.tokenizer(yp, return_tensors="pt", padding=True).to(self.device)
 
             edit_sucess = (tokenized["input_ids"] == res_alt.logits.argmax(dim=-1))[
                     tokenized["input_ids"] != self.tokenizer.pad_token_id]
+            edit_sucess_loc = (tokenized_p["input_ids"] == resp_alt.logits.argmax(dim=-1))[
+                tokenized_p["input_ids"] != self.tokenizer.pad_token_id]
+
             target_prob_diff = (target_alt_prob - target_prob).squeeze(dim=1)
 
             edit_successes = torch.cat([edit_successes, edit_sucess])
             target_prob_diffes = torch.cat([target_prob_diffes, target_prob_diff])
+            edit_successes_p = torch.cat([edit_successes_p, edit_sucess_loc])
 
         es = edit_successes.float().mean().cpu().item()
+        esp = edit_successes_p.float().mean().cpu().item()
         tbp = target_prob_diffes.mean().cpu().item()
 
-        L.info(f"VAL | DONE | edit success {round(es, 3)} | target prob diff {round(tbp, 3)}")
+        L.info(f"VAL | DONE | edit success {round(es, 3)} | edit success localization {round(esp, 3)} | target prob diff {round(tbp, 3)}")
 
         logs = {
             "val/edit_success": es,
+            "val/edit_success_localization": esp,
             "val/target_prob_diff": tbp,
         }
 
@@ -251,6 +269,23 @@ class MENDTrainer:
         self.args = Namespace(**data.get("config", {}))
         self.global_step_counter_ = data.get("steps", 0)
         self.best_val_ = data.get("performance", float("-inf"))
+
+    def finish():
+        # and write results
+        arg = self.args
+        (args.out_dir / args.results_dir).mkdir(parents=True, exist_ok=True)
+        out_path = args.out_dir / args.results_dir / "mend.json"
+
+        # load best dir and calculate final results
+        self.load(self.best_dir)
+        results = self.val()[0]
+
+        # write to file
+        with open(out_path, 'w') as df:
+            json.dump(results, df)
+
+        self.accelerator.end_training()
+
 
     def step(self, d_edit, d_equiv, d_locality, c_edit=1e-2, c_loc=1):
 
