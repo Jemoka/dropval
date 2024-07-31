@@ -93,6 +93,10 @@ class SquadTrainer:
         config = self.config
 
         for indx, batch in enumerate(iter(self.train_dl)):
+            if self.global_step_counter_ > (self.config.epochs*len(self.train_dl)):
+                L.info("DONE WITH TRAINING")
+                break
+
             if indx % 1024 == 0:
                 # we can do this because we are not training more than
                 # one epoch

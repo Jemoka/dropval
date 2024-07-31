@@ -22,23 +22,30 @@ args = Namespace(
 
     # training config
     val_split=0.1,
-    concepts="English",
+
+    # overridable specific configs
+    lr = None,
+    batch_size = None,
+    epochs = None,
+
+    # bmask specific configs
+    beta = 1e-5,
+
+    # squad specific setting
+    decay = 0.9,
+    warmup = 0.1,
+
+    # settings to be hydrated    
+    lr = None,
+    epochs = None,
+    batch_size = None
 )
 
-# make output dir
-actual_out_dir = (Path(args.out_dir) / args.experiment)
-actual_out_dir.mkdir(parents=True, exist_ok=True)
-args.out_dir = actual_out_dir
-
-# hydrate data dir
-args.data_dir = Path(args.data_dir)
-
-model, tokenizer, config = load_base(args)
-args.__dict__["model_config"] = config
-
+args, model, tokenizer = load(args)
 accelerator = get_accelerator(args)
 
-model
-tokenizer
-config
+if args.task = 
+
+
+
 

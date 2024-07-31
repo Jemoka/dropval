@@ -53,9 +53,12 @@ from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
 
 class BMask:
-    def __init__(self, args, accelerator, model, tokenizer):
+    def __init__(self, args, accelerator, model, tokenizer, concept=None):
+        assert concept "Please supply a concept!" # possible through API to accidentally not
+                                                  # but concept must be optional to maintain call signature
+
         self.accelerator = accelerator
-        self.load_dir = args.out_dir / args.intermediate_dir / f"bmask_{args.concept}" / "best"
+        self.load_dir = args.out_dir / args.intermediate_dir / f"bmask_{concept}" / "best"
 
         self.model = model
         self.tokenizer = tokenizer
@@ -63,7 +66,7 @@ class BMask:
 
         out_dir = args.out_dir / args.results_dir / "bmask" 
         out_dir.mkdir(parents=True, exist_ok=True)
-        self.out_file = out_dir / f"bmask_{args.concept}"
+        self.out_file = out_dir / f"bmask_{concept}"
 
 
     def __call__(self):

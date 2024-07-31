@@ -18,7 +18,7 @@ def get_accelerator(config):
         config=vars(config),
         init_kwargs={"wandb": {"entity": "jemoka",
                                "mode": None if config.wandb else "disabled",
-                               "name": config.experiment}},
+                               "name": config.experiment+"_"+config.task}},
     )
 
     return accelerator

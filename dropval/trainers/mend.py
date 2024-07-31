@@ -34,6 +34,8 @@ class MENDTrainer:
         self.save_dir = args.out_dir / args.intermediate_dir / "mend"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
+        self.epoch = 0
+
         self.args = args
         train_ds, val_ds = hydrate_mend(args.data_dir / "paratrace.csv", args.val_split)
 
@@ -60,6 +62,8 @@ class MENDTrainer:
         [self.push(*i) for i in args.model_config["mend_layers"]]
         self.compile()
 
+        if (self.save_dir / "checkpoint" / "config.json").exists():
+            self.load(self.save_dir / "checkpoint")
 
     def compile(self):
         """compile the mender, meaning we can't change targets, etc.
@@ -228,6 +232,10 @@ class MENDTrainer:
 
     def epoch(self):
         for indx, i in enumerate(iter(self.train_dl)):
+            if self.global_step_counter_ > (self.args.epochs*len(self.train_dl)):
+                L.info("DONE WITH TRAINING")
+                break
+
             try:
                 step = self.step((i["xs"], i["ys"]),
                                  (i["xp"], i["yp"]),
@@ -251,14 +259,16 @@ class MENDTrainer:
 
             self.global_step_counter_ += 1
 
+        self.epoch += 1
+
     def save(self, path):
         self.accelerator.save_state(path)
         with open(os.path.join(path, "config.json"), 'w') as df:
             json.dump({
                 "config": vars(self.args),
                 "steps": self.global_step_counter_,
-                "performance": self.best_val_
-
+                "performance": self.best_val_,
+                "epoch": self.epoch,
             }, df)
 
     def load(self, path):
@@ -268,6 +278,7 @@ class MENDTrainer:
 
         self.args = Namespace(**data.get("config", {}))
         self.global_step_counter_ = data.get("steps", 0)
+        self.epoch = data.get("epoch", 0)
         self.best_val_ = data.get("performance", float("-inf"))
 
     def finish():

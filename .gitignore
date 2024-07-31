@@ -3,3 +3,4 @@ output
 pretrain
 data
 *.pyc
+*#
