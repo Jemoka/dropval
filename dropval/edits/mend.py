@@ -1,0 +1,372 @@
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+from types import SimpleNamespace
+
+from dropval.model import MEND
+from dropval.guards.linear import LinearParamGuard, MultiLinearParamGuard, set_requires_grad
+
+from accelerate import Accelerator
+from argparse import Namespace
+
+import wandb
+from torch.optim import Adam 
+import torch.nn.functional as F
+
+from data import hydrate_mend
+
+import os
+from torch.utils.data.dataloader import DataLoader, Dataset
+
+from pathlib import Path
+
+import json
+import torch
+import einops
+import warnings
+
+from contextlib import contextmanager
+
+from accelerate.logging import get_logger
+L = get_logger("dropval", log_level="DEBUG")
+
+
+class MENDer:
+    def __init__(self, args, model, tokenizer):
+        self.save_dir = Path(args.output)
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+
+        self.args = args
+        train_ds, val_ds = hydrate_mend(args.dataset, args.val_split)
+
+        self.train_dl = DataLoader(train_ds, args.batch_size, shuffle=True)
+        self.val_dl = DataLoader(val_ds, args.batch_size, shuffle=True)
+
+        self.accelerator = Accelerator(log_with="wandb")
+        self.accelerator.init_trackers(
+            project_name="dropval", 
+            config=vars(args),
+            init_kwargs={"wandb": {"entity": "jemoka",
+                                   "mode": None if args.wandb else "disabled"}},
+        )
+
+        self.model = model
+        set_requires_grad(False, self.model)
+
+        self.hidden_size = args.hidden_size
+        self.tokenizer = tokenizer
+        self.layers = []
+        self.mends = []
+
+        self.lr = args.lr
+        self.global_step_counter_ = 0
+        self.best_val_ = float("-inf")
+
+        # to build optimizers, etc.
+        self.__compiled = False
+
+    def compile(self):
+        """compile the mender, meaning we can't change targets, etc.
+        after this is done."""
+
+        params = sum([list(i.parameters()) for i in self.mends], [])
+
+        self.mends = self.accelerator.prepare(*self.mends)
+        (self.optim,
+         self.train_dl, self.val_dl) = self.accelerator.prepare(Adam(params, lr=self.lr),
+                                                                self.train_dl,
+                                                                self.val_dl)
+        self.model = self.model.to(self.device)
+        self.__compiled = True
+        if self.accelerator.is_main_process:
+            wandb.watch(*self.mends)
+
+    def push(self, *layers):
+        """push a type of layers, using one mend type
+
+        Parameters
+        ----------
+        layers : List[str]
+            the layers to intervene as one MEND unit
+        """
+
+        if self.__compiled:
+            warnings.warn("Attempting to push layers onto an already compiled mender"
+                          "will have to call .compile() again and will loose training"
+                          "gradients.")
+            
+
+        res = []
+        for target in layers:
+            l = self.model
+            for i in target.split("."):
+                l = getattr(l, i)
+
+            res.append(l)
+        self.layers.append(res)
+        mender = MEND(res[0].dense.in_features,
+                      res[0].dense.out_features,
+                      self.hidden_size,
+                      len(res)).to(self.device)
+        mender.train()
+        self.mends.append(mender)
+
+    @property
+    def device(self):
+        return self.accelerator.device
+
+    def __compute_edit(self, xs, ys, group_idx, layer_idx):
+        layer = self.layers[group_idx][layer_idx]
+
+        # tape is to tape the gradients
+        with LinearParamGuard(layer, "dense", tape=True) as pg:
+            input = self.tokenizer(xs, return_tensors="pt", padding=True).to(self.device)
+            output = self.tokenizer(ys, return_tensors="pt", padding=True).to(self.device)
+            res = self.model(**input, labels=output["input_ids"])
+
+            # get the paramguard tape for activations, sum down the batch and sequence dims
+            u = einops.rearrange(pg.activations[0], "b i j -> (b i) j")
+            d = einops.rearrange(pg.grad(res.loss), "b i j -> (b i) j")
+
+            # mendocino time
+            mend = self.mends[group_idx]
+            u_tilde, d_tilde, alpha = mend(u.detach(), d.detach(), layer_idx)
+
+            # compose final delta matrix
+            dW = (d_tilde.unsqueeze(-1) @ (u_tilde*alpha).unsqueeze(-2))
+
+        return layer, dW.mean(dim=0) # mean over batch and dim to make edit sequence agnostic
+
+    def val(self):
+        self.eval()
+        edit_successes = torch.tensor([]).to(self.device)
+        target_prob_diffes = torch.tensor([]).to(self.device)
+
+        for indx, i in enumerate(iter(self.val_dl)):
+            if indx % 100 == 0:
+                L.info(f"VAL | {indx}/{len(self.val_dl)}")
+            xs = i["xs"]
+            ys = i["ys"]
+
+            ((res, res_alt), (target_prob, target_alt_prob),
+            (argmax_idx, argmax_alt_idx),
+            target) = self(xs, ys)
+
+            tokenized = self.tokenizer(ys, return_tensors="pt", padding=True).to(self.device)
+
+            edit_sucess = (tokenized["input_ids"] == res_alt.logits.argmax(dim=-1))[
+                    tokenized["input_ids"] != self.tokenizer.pad_token_id]
+            target_prob_diff = (target_alt_prob - target_prob).squeeze(dim=1)
+
+            edit_successes = torch.cat([edit_successes, edit_sucess])
+            target_prob_diffes = torch.cat([target_prob_diffes, target_prob_diff])
+
+        es = edit_successes.float().mean().cpu().item()
+        tbp = target_prob_diffes.mean().cpu().item()
+
+        L.info(f"VAL | DONE | edit success {round(es, 3)} | target prob diff {round(tbp, 3)}")
+
+        logs = {
+            "val/edit_success": es,
+            "val/target_prob_diff": tbp,
+        }
+
+        self.train()
+
+        return logs, es, tbp
+
+    def train(self):
+        self.mends = [i.train() for i in self.mends]
+        return self
+    def eval(self):
+        self.mends = [i.eval() for i in self.mends]
+        return self
+
+    def __call__(self, xs, ys, xp=None, yp=None):
+        layers = []
+        edits = []
+        for group_idx in range(len(self.layers)):
+            for layer_idx in range(len(self.layers[group_idx])):
+                layer, dW = self.__compute_edit(xs, ys, group_idx, layer_idx)
+                layers.append(layer)
+                edits.append(dW)
+
+        if xp == None or yp == None:
+            xp = xs
+            yp = ys
+        input_p = self.tokenizer(xp, return_tensors="pt", padding=True).to(self.device)
+        output_p = self.tokenizer(yp, return_tensors="pt", padding=True).to(self.device)
+
+        mask_loc = (input_p["input_ids"] == self.tokenizer.mask_token_id)
+        target = output_p["input_ids"][mask_loc].unsqueeze(1)
+
+        with self.apply_edits_(layers, edits):
+            res_alt = self.model(**input_p, labels=output_p["input_ids"])
+
+        res = self.model(**input_p, labels=output_p["input_ids"])
+
+        res_dist = F.softmax(res.logits[mask_loc], dim=1)
+        res_alt_dist = F.softmax(res_alt.logits[mask_loc], dim=1)
+
+        target_prob = res_dist.gather(1, target)
+        target_alt_prob = res_alt_dist.gather(1, target)
+
+        argmax_idx = res.logits[mask_loc].argmax(dim=1)
+        argmax_alt_idx = res_alt.logits[mask_loc].argmax(dim=1)
+
+        return (res, res_alt), (target_prob, target_alt_prob), (argmax_idx, argmax_alt_idx), target.squeeze(1)
+
+    def epoch(self):
+        for indx, i in enumerate(iter(self.train_dl)):
+            try:
+                step = self.step((i["xs"], i["ys"]),
+                                 (i["xp"], i["yp"]),
+                                 (i["xloc"], i["yloc"]))
+            except ValueError:
+                # tokenizer fault
+                continue
+
+            if indx % 256 == 0:
+                logs, es, tbp = self.val()
+                self.accelerator.log(logs, step=self.global_step_counter_)
+                self.save(self.save_dir / "checkpoint")
+                if (es + tbp)/2 > self.best_val_:
+                    self.best_val_ = (es + tbp)/2
+                    self.save(self.save_dir / "best")
+                
+
+            if indx % 16 == 0:
+                self.accelerator.log({"training/loss": step}, step=self.global_step_counter_)
+                L.info(f"TRAIN | {indx}/{len(self.train_dl)} | loss {round(step, 3)}")
+
+            self.global_step_counter_ += 1
+
+    def save(self, path):
+        self.accelerator.save_state(path)
+        with open(os.path.join(path, "config.json"), 'w') as df:
+            json.dump({
+                "config": vars(self.args),
+                "steps": self.global_step_counter_,
+                "performance": self.best_val_
+
+            }, df)
+
+    def load(self, path):
+        self.accelerator.load_state(path)
+        with open(os.path.join(path, "config.json"), 'r') as df:
+            data = json.load(df)
+
+        self.args = Namespace(**data.get("config", {}))
+        self.global_step_counter_ = data.get("steps", 0)
+        self.best_val_ = data.get("performance", float("-inf"))
+
+    def step(self, d_edit, d_equiv, d_locality, c_edit=1e-2, c_loc=1):
+
+        # first, compute all the edits
+        layers = []
+        edits = []
+        (xs, ys) = d_edit
+        for group_idx in range(len(self.layers)):
+            for layer_idx in range(len(self.layers[group_idx])):
+                layer, dW = self.__compute_edit(xs, ys, group_idx, layer_idx)
+                layers.append(layer)
+                edits.append(dW)
+
+        # then, compute loss  across all layrs
+        loss = self.__step(d_equiv, d_locality, layers, edits, c_edit, c_loc)
+
+        # lastly, optimize
+        loss.backward()
+        # [i.grad for i in self.mends[0].parameters()]
+        self.optim.step()
+        self.optim.zero_grad()
+
+        return loss.cpu().item()
+
+    @contextmanager
+    def apply_edits_(self, layers, edits):
+        pg = MultiLinearParamGuard(layers)
+        try:
+            pg.__enter__()
+            # we do this to properly generate the function with the right contexts
+            def edit(edits):
+                def inner(inp, oup, weights):
+                    return torch.einsum("...i,oi -> ...o", inp, (weights-edits))
+                return inner
+            pg.intervene([edit(i) for i in edits])
+            yield pg
+        finally:
+            pg.reset()
+            pg.__exit__(None, None, None)
+
+    def __step(self, d_equiv, d_locality, layers, edits, c_edit=1e-2, c_loc=1):
+        assert self.__compiled, "attempting to call step on an uncompiled editor; bad things is likely to happen. call .compile() on your MENDer"
+
+        (xp, yp) = d_equiv
+        (xloc, yloc) = d_locality
+
+        # compute loc baseline
+        input_loc = self.tokenizer(xloc, return_tensors="pt", padding=True).to(self.device)
+        output_loc = self.tokenizer(yloc, return_tensors="pt", padding=True).to(self.device)
+        res_loc_orig = self.model(**input_loc, labels=output_loc["input_ids"])
+
+        # compute editing example
+        input_p = self.tokenizer(xp, return_tensors="pt", padding=True).to(self.device)
+        output_p = self.tokenizer(yp, return_tensors="pt", padding=True).to(self.device)
+
+        with self.apply_edits_(layers, edits):
+            # compute loc intervention
+            res_loc_intervene = self.model(**input_loc, labels=output_loc["input_ids"])
+            res_p = self.model(**input_p, labels=output_p["input_ids"])
+
+        res_loc_orig = F.softmax(res_loc_orig.logits, dim=2)
+        res_loc_intervene = F.softmax(res_loc_intervene.logits, dim=2)
+
+        # for editing loss
+        res_p = F.softmax(res_p.logits, dim=2)
+        target_alt = output_p["input_ids"]
+
+        # locality loss: KL divergence
+        L_loc =  einops.rearrange(F.kl_div(res_loc_intervene, 
+                                           res_loc_orig,
+                                           reduction='none'), "i j k -> (i j) k").sum(dim=1).mean(dim=0)
+
+        # editing loss with nearby sample: nll
+        # ignore padding tokens
+        loss_sec = res_p.gather(2, target_alt.unsqueeze(-1))[~(target_alt == self.tokenizer.pad_token_id)]
+        L_e = -loss_sec.log().sum()
+
+        L = L_loc*c_loc + L_e*c_edit
+
+        return L
+
+
+# from transformers import AutoModelForMaskedLM, AutoTokenizer
+# from argparse import Namespace
+
+# args = Namespace(
+    # experiment="mend",
+    # output="./models",
+    # lr=1e-4,
+    # batch_size=10,
+    # dataset="./data/pararel.csv",
+    # val_split=0.1,
+    # hidden_size=1920,
+    # wandb=False,
+# )
+
+# tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-large")
+# model = AutoModelForMaskedLM.from_pretrained("FacebookAI/roberta-large")
+
+# mender = MENDer(args, model, tokenizer)
+
+# mender.push("roberta.encoder.layer.21.intermediate",
+            # "roberta.encoder.layer.22.intermediate",
+            # "roberta.encoder.layer.23.intermediate")
+
+# mender.push("roberta.encoder.layer.21.output",
+            # "roberta.encoder.layer.22.output",
+            # "roberta.encoder.layer.23.output")
+
+# mender.compile()
+# mender.epoch()
+
+
