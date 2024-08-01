@@ -64,6 +64,8 @@ class BMaskTrainer:
         self.push(*args.model_config["bmask_layers"])
         self.compile()
 
+        self.total_batches = len(self.train_dl)
+
         if (self.save_dir / "checkpoint" / "config.json").exists():
             self.load(self.save_dir / "checkpoint")
 
@@ -236,12 +238,16 @@ class BMaskTrainer:
 
         return (res, res_alt), (target_prob, target_alt_prob), (argmax_idx, argmax_alt_idx), target.squeeze(1)
 
-    def epoch(self):
-        for indx, i in enumerate(iter(self.train_dl)):
-            if self.global_step_counter_ > (self.args.epochs*len(self.train_dl)):
-                L.info("SKIPPING EPOCH...")
-                break
+    def epoch(self, eid=None):
+        train_dl = self.accelerator.skip_first_batches(self.train_dl,
+                self.global_step_counter_ % self.total_batches)
 
+        if eid != None:
+            if self.global_step_counter_ > (eid*self.total_batches):
+                L.info("SKIPPING EPOCH...")
+                return
+
+        for indx, i in enumerate(iter(train_dl)):
             try:
                 step = self.step(i["x"], i["y"])
             except ValueError:
@@ -259,7 +265,7 @@ class BMaskTrainer:
 
             if indx % 16 == 0:
                 self.accelerator.log({"bmask/training/loss": step}, step=self.global_step_counter_)
-                L.info(f"TRAIN | {indx}/{len(self.train_dl)} | loss {round(step, 3)}")
+                L.info(f"TRAIN | {indx} | {len(self.train_dl)-self.global_step_counter_ % self.total_batches} | loss {round(step, 3)}")
 
             self.global_step_counter_ += 1
 
@@ -280,8 +286,6 @@ class BMaskTrainer:
         self.args = Namespace(**data.get("config", {}))
         self.global_step_counter_ = data.get("steps", 0)
         self.best_val_ = data.get("performance", float("-inf"))
-        self.train_dl = self.accelerator.skip_first_batches(self.train_dl,
-                                                            self.global_step_counter_)
 
     def step(self, xs, ys):
         assert self.__compiled, "attempting to call step on an uncompiled editor; bad things is likely to happen. call .compile() on your BMask"

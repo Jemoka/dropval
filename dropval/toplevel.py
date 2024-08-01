@@ -10,16 +10,20 @@ L = get_logger("dropval", log_level="DEBUG")
 
 def dispatch_bmask_(args, accelerator, model, tokenizer):
     # for each concept, if it isn't prepared already, prepare it
-    for concept in BMaskTrainer.concepts(args):
-        if (Path(args.out_dir) / args.results_dir / "bmask"  / f"bmask_{concept}").exists():
+    concepts = BMaskTrainer.concepts(args)
+    for indx, concept in enumerate(concepts):
+        L.info(f"CONCEPT | BMASK | {concept} | {indx} / {len(concepts)}")
+        if (Path(args.out_dir) / args.results_dir / "bmask"  / f"bmask_{concept}.json").exists():
+            L.info(f"CONCEPT | BMASK | {concept} | SKIPPING")
             continue
 
         trainer = BMaskTrainer(args, accelerator, model, tokenizer, concept)
+
         for i in range(args.epochs):
             L.info(f"EPOCH | BMASK | {i} / {args.epochs}")
-            trainer.epoch()
+            trainer.epoch(i)
 
-        evaluator = BMask(args, accelerator, model, tokenizer, concept)
+        evaluator = BMask(args, accelerator, trainer, concept)
         evaluator()
 
 def dispatch_mend_(args, accelerator, model, tokenizer):

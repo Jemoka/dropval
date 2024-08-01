@@ -53,29 +53,21 @@ from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
 
 class BMask:
-    def __init__(self, args, accelerator, model, tokenizer, concept=None):
+    def __init__(self, args, accelerator, trainer, concept=None):
         assert concept, "Please supply a concept!" # possible through API to accidentally not
                                                   # but concept must be optional to maintain call signature
 
-        self.accelerator = accelerator
-        self.load_dir = args.out_dir / args.intermediate_dir / f"bmask_{concept}" / "best"
-
-        self.model = model
-        self.tokenizer = tokenizer
+        self.concept = concept
         self.args = args
+        self.trainer = trainer
 
-        out_dir = args.out_dir / args.results_dir / "bmask" 
+        out_dir = Path(args.out_dir) / args.results_dir / "bmask" 
         out_dir.mkdir(parents=True, exist_ok=True)
-        self.out_file = out_dir / f"bmask_{concept}"
+        self.out_file = out_dir / f"bmask_{concept}.json"
 
 
     def __call__(self):
-        with open(os.path.join(self.load_dir, "config.json"), 'r') as df:
-            data = json.load(df)["config"]
-            data["wandb"] = False
-
-        mender = BMaskTrainer(Namespace(**data), self.model, self.tokenizer)
-        mender.load(self.load_dir)
+        mender = self.trainer
 
         validation = mender.val()
 
@@ -92,5 +84,5 @@ class BMask:
         }
 
         with open(self.out_file, 'w') as df:
-            json.dump(results, df)
+            json.dump(results, df, indent=4)
 
