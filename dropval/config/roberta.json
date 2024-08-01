@@ -1,5 +1,6 @@
 {
     "mask": "<mask>",
+    "model_type": "roberta",
     "mend_layers": [
         [
             "roberta.encoder.layer.21.intermediate",

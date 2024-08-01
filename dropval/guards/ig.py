@@ -161,8 +161,10 @@ class LanguageModel:
         ]
         self.num_layers = len(self.layer_names)
 
-    def ffn_layers(self):
-        for i in self.model.bert.encoder.layer:
+    def ffn_layers(self, model_type):
+        part = self.model
+        part = getattr(part, model_type)
+        for i in part.encoder.layer:
             yield (i.intermediate, "dense")
             
     @property

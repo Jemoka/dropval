@@ -82,7 +82,12 @@ L = get_logger("dropval", log_level="DEBUG")
 
 class KN:
     def __init__(self, args, accelerator, model, tokenizer):
-        self.df = pd.read_csv(args.data_dir / "paratrace.csv")
+        self.args = args
+
+        consistency = args.out_dir / args.results_dir / "consistency.csv"
+        assert consistency.exists(), "run consistency task first, we need its outputs"
+
+        self.df = pd.read_csv(consistency)
 
         self.accelerator = accelerator
 
@@ -92,8 +97,8 @@ class KN:
         out_path.mkdir(parents=True, exist_ok=True)
 
         self.__out_file_s1 = out_path / "kns.json"
-        self.__out_file_s2 = (str(out_path / f"kns_CONCEPT_intervene.json"),
-                              str(out_path / f"kns_CONCEPT_baseline.json"))
+        self.__out_file_s2 = (str(out_path / f"kns_CONCEPT_intervene.csv"),
+                              str(out_path / f"kns_CONCEPT_baseline.csv"))
 
     def __call__(self):
         df = self.df
@@ -103,26 +108,28 @@ class KN:
         else:
             res = pd.DataFrame(columns=df.columns.tolist()+["knowledge"])
 
-        rdf = df[["target", "pattern"]].drop_duplicates()
+        rdf = df[["target"]].drop_duplicates()
 
         for a, v in rdf.iterrows():
             i = v.target
 
             L.info(f"probing {i}; keyword ({a}/{len(rdf)})...")
 
-            if (Path(self.__out_file_s2[0].replace(CONCEPT, i)).exists() and
-                Path(self.__out_file_s2[1].replace(CONCEPT, i)).exists()):
+            if (Path(self.__out_file_s2[0].replace("CONCEPT", i)).exists() and
+                Path(self.__out_file_s2[1].replace("CONCEPT", i)).exists()):
                 continue
 
-            total = len(df[df.target == i])
-            for indx, (_, row) in enumerate(df[df.target == i].iterrows()):
-                if indx % 5 == 0:
-                    res.to_json(str(self.__out_file_s1), index=False, orient="split", indent=2)
-                    L.info(f"probing {i}; progress ({indx}/{total})...")
+            if sum(res.target == i) == 0:
+                total = len(df[df.target == i])
+                for indx, (_, row) in enumerate(df[df.target == i].iterrows()):
+                    if indx % 5 == 0:
+                        L.info(f"probing {i}; progress ({indx}/{total})...")
+
                     knowledge = self.probe(row.probe, row.target, self.lm)
                     row["knowledge"] = knowledge.cpu().tolist()
                     res.loc[len(res)] = row
-                    res.to_json(str(self.__out_file_s1), index=False, orient="split", indent=2)
+
+                res.to_json(str(self.__out_file_s1), index=False, orient="split", indent=2)
 
             self.stage2_(res, i)
 
@@ -192,9 +199,9 @@ class KN:
                     probe = i.probe
                     target = i.target
 
-                    res_suppress = intervene(probe, target, lm,
+                    res_suppress = self.intervene(probe, target, lm,
                                             [i[0] for i in kn_counts[:10]], mode=0)
-                    res_augment = intervene(probe, target, lm,
+                    res_augment = self.intervene(probe, target, lm,
                                             [i[0] for i in kn_counts[:10]], mode=3)
 
                     results.append({
@@ -207,7 +214,7 @@ class KN:
                     })
 
         results = pd.DataFrame(results)
-        results.to_csv(self.__out_file_s2[0].replace(CONCEPT, concept), index=False)
+        results.to_csv(self.__out_file_s2[0].replace("CONCEPT", concept), index=False)
 
         np.random.shuffle(res_cls)
 
@@ -231,9 +238,9 @@ class KN:
                 probe = i.probe
                 target = i.target
 
-                res_suppress = intervene(probe, target, lm,
+                res_suppress = self.intervene(probe, target, lm,
                                         [i[0] for i in kn_counts[:10]], mode=0)
-                res_augment = intervene(probe, target, lm,
+                res_augment = self.intervene(probe, target, lm,
                                         [i[0] for i in kn_counts[:10]], mode=3)
 
                 results.append({
@@ -246,12 +253,12 @@ class KN:
                 })
 
         results = pd.DataFrame(results)
-        results.to_csv(self.__out_file_s2[1].replace(CONCEPT, concept), index=False)
+        results.to_csv(self.__out_file_s2[1].replace("CONCEPT", concept), index=False)
 
 
-    @staticmethod
-    def probe(probe, target, lm, threshold=0.2, batch_size=128, steps=5):
-        layers = list(lm.ffn_layers())
+    def probe(self, probe, target, lm, threshold=0.2, batch_size=128, steps=5):
+        probe = probe.replace("[MASK]", self.args.model_config["mask"])
+        layers = list(lm.ffn_layers(self.args.model_config["model_type"]))
 
         attrs_by_layer = torch.tensor([]).to(lm.device)
         target_idx = lm.tokenizer.convert_tokens_to_ids(target)
@@ -263,7 +270,7 @@ class KN:
                 mask_loc = mask_loc.item()
 
                 baseline = pg.baseline[mask_loc]
-                weighting = torch.linspace(0, 1, steps=steps)
+                weighting = torch.linspace(0, 1, steps=steps).to(lm.device)
                 scaled = torch.einsum("x,y -> yx", baseline, weighting).to(lm.device)
 
                 # interpolate shape
@@ -289,9 +296,9 @@ class KN:
 
         return knowledge_neurons
 
-    @staticmethod
-    def intervene(probe, target, lm, kn, mode="suppress"):
-        layers = list(lm.ffn_layers())
+    def intervene(self, probe, target, lm, kn, mode="suppress"):
+        probe = probe.replace("[MASK]", self.args.model_config["mask"])
+        layers = list(lm.ffn_layers(self.args.model_config["model_type"]))
 
         attrs_by_layer = torch.tensor([]).to(lm.device)
         target_idx = lm.tokenizer.convert_tokens_to_ids(target)

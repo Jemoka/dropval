@@ -1,5 +1,6 @@
 {
     "mask": "[MASK]",
+    "model_type": "bert",
     "mend_layers": [
         [
             "bert.encoder.layer.9.intermediate",
