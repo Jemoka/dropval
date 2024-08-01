@@ -37,8 +37,6 @@ import wandb
 from torch.optim import Adam 
 import torch.nn.functional as F
 
-from data import hydrate_mend
-
 import os
 from torch.utils.data.dataloader import DataLoader, Dataset
 
@@ -126,7 +124,7 @@ class KN:
                     res.loc[len(res)] = row
                     res.to_json(str(self.__out_file_s1), index=False, orient="split", indent=2)
 
-            self.stage2(res, i)
+            self.stage2_(res, i)
 
     def stage2_(self, df, concept):
         lm = self.lm
@@ -172,7 +170,7 @@ class KN:
                 res_cls = cls.labels_
 
         if best_cluster == None:
-            continue
+            return
 
         results = []
 
@@ -221,31 +219,31 @@ class KN:
 
                 # for each knowledge neuron, identify its count
             kn_counts = defaultdict(int)
-                for i in knowledge:
-                    for j in i:
-                        kn_counts[tuple(j)] += 1
-                kn_counts = list(dict(kn_counts).items())
-                kn_counts = sorted(kn_counts, key=lambda x:x[1], reverse=True)
+            for i in knowledge:
+                for j in i:
+                    kn_counts[tuple(j)] += 1
+            kn_counts = list(dict(kn_counts).items())
+            kn_counts = sorted(kn_counts, key=lambda x:x[1], reverse=True)
 
-                sample = rel[res_cls == k2]
+            sample = rel[res_cls == k2]
 
-                for indx, i in sample.iterrows():
-                    probe = i.probe
-                    target = i.target
+            for indx, i in sample.iterrows():
+                probe = i.probe
+                target = i.target
 
-                    res_suppress = intervene(probe, target, lm,
-                                            [i[0] for i in kn_counts[:10]], mode=0)
-                    res_augment = intervene(probe, target, lm,
-                                            [i[0] for i in kn_counts[:10]], mode=3)
+                res_suppress = intervene(probe, target, lm,
+                                        [i[0] for i in kn_counts[:10]], mode=0)
+                res_augment = intervene(probe, target, lm,
+                                        [i[0] for i in kn_counts[:10]], mode=3)
 
-                    results.append({
-                        "match": k1 == k2,
-                        "was_correct": i.pred_tokens == i.target,
-                        "suppress_success": res_suppress[1][0][0] != i.target,
-                        "augment_success":res_augment[1][0][0] == i.target,
-                        "knowledge_cluster": k1,
-                        "intervene_cluster": k2,
-                    })
+                results.append({
+                    "match": k1 == k2,
+                    "was_correct": i.pred_tokens == i.target,
+                    "suppress_success": res_suppress[1][0][0] != i.target,
+                    "augment_success":res_augment[1][0][0] == i.target,
+                    "knowledge_cluster": k1,
+                    "intervene_cluster": k2,
+                })
 
         results = pd.DataFrame(results)
         results.to_csv(self.__out_file_s2[1].replace(CONCEPT, concept), index=False)

@@ -5,6 +5,26 @@ from pathlib import Path
 import argparse
 from argparse import Namespace
 
+from accelerate import Accelerator
+from accelerate.logging import get_logger
+
+import logging
+import numpy as np
+import torch
+import random
+
+L = get_logger("dropval", log_level="DEBUG")
+
+logging.basicConfig(level=logging.WARNING,
+                    format='%(asctime)s %(levelname)s %(funcName)s %(message)s',
+                    handlers=[logging.StreamHandler()])
+L.setLevel(logging.DEBUG)
+
+torch.manual_seed(0)
+random.seed(0)
+np.random.seed(0)
+
+
 if __name__ == "__main__":
     # create our parser
     parser = argparse.ArgumentParser(prog='dropval')
@@ -12,10 +32,10 @@ if __name__ == "__main__":
     # experiment
     parser.add_argument("experiment", type=str)
     parser.add_argument("task", choices=["bmask", "mend", "squad", "kn", "consistency"])
-    parser.add_argument("base", type="str")
+    parser.add_argument("base", type=str)
 
     # wandb
-    parser.add_argument("--wandb", type=bool, default=False)
+    parser.add_argument("--wandb", action="store_true")
 
     # directories
     parser.add_argument("--out_dir", type=str, default="./output")

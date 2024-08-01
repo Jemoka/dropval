@@ -1,6 +1,6 @@
 from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer
 from dropval.measurements import BMask, Consistency, KN
-from dropval import get_accelerator
+from dropval.utils import get_accelerator
 
 from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
@@ -35,10 +35,6 @@ def dispatch_squad_(args, accelerator, model, tokenizer):
     trainer.finish()
 
 def dispatch_consistency_(args, accelerator, model, tokenizer):
-    if (args.out_dir / args.results_dir / "consistency.csv").exists():
-        L.info("CONSISTENCY | Results exist, skipping...")
-        return
-
     evaluator = Consistency(args, accelerator, model, tokenizer)
     evaluator()
 

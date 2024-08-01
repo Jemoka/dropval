@@ -1,4 +1,5 @@
 from pathlib import Path
+from dropval.utils import load_base
 
 DEFAULTS = {
     "bmask": {
@@ -15,6 +16,11 @@ DEFAULTS = {
         "lr": 0.00001,
         "epochs": 2,
         "batch_size": 12
+    },
+    "consistency": {
+        "lr": None,
+        "epochs": None,
+        "batch_size": 16
     }
 }
 
@@ -30,10 +36,11 @@ def load(args):
     model, tokenizer, config = load_base(args)
     args.__dict__["model_config"] = config
 
-    # hydrate any shared argumensts
-    args.lr = args.lr if args.lr else DEFAULTS[args.task]["lr"]
-    args.batch_size = args.batch_size if args.batch_size else DEFAULTS[args.task]["batch_size"]
-    args.epochs = args.epochs if args.epochs else DEFAULTS[args.task]["epochs"]
+    if DEFAULTS.get(args.task):
+        # hydrate any shared argumensts
+        args.lr = args.lr if args.lr else DEFAULTS[args.task]["lr"]
+        args.batch_size = args.batch_size if args.batch_size else DEFAULTS[args.task]["batch_size"]
+        args.epochs = args.epochs if args.epochs else DEFAULTS[args.task]["epochs"]
 
     return args, model, tokenizer
 

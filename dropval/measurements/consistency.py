@@ -58,7 +58,7 @@ class Consistency:
     def device(self):
         return self.accelerator.device
 
-    def __call__():
+    def __call__(self):
         final = defaultdict(list)
 
         mask_tok_str = self.tokenizer.mask_token
@@ -66,7 +66,7 @@ class Consistency:
 
         for indx, i in tqdm(enumerate(iter(self.dl)), total=len(self.dl)):
             tok = self.tokenizer([j.replace("[MASK]", mask_tok_str) for j in i["probe"]], return_tensors="pt", padding=True)
-            res = self.model(**tok.to(DEVICE)).logits
+            res = self.model(**tok.to(self.accelerator.device)).logits
             target_idx = self.tokenizer.convert_tokens_to_ids(i["target"])
             mask_idx = (tok["input_ids"] == mask_tok).nonzero()[:,1]
             target_probs = F.softmax(res[torch.arange(mask_idx.size(0)), mask_idx], dim=1)[torch.arange(mask_idx.size(0)), target_idx]
@@ -78,9 +78,12 @@ class Consistency:
             final["target"] += i["target"]
             final["pattern"] += i["pattern"]
             final["target_probs"] += target_probs.cpu().tolist()
-            final["pred_tokens"] += pred_tokens
+            final["pred_tokens"] += [i.replace("Ġ", "") for i in pred_tokens]
             final["pred_probs"] += pred_probs.cpu().tolist()
 
             if indx % 10 == 0:
-                serialized = pd.DataFrame(dict(final))
+                try:
+                    serialized = pd.DataFrame(dict(final))
+                except:
+                    breakpoint()
                 serialized.to_csv(self.__out_file, index=False)

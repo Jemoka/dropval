@@ -54,7 +54,7 @@ L = get_logger("dropval", log_level="DEBUG")
 
 class BMask:
     def __init__(self, args, accelerator, model, tokenizer, concept=None):
-        assert concept "Please supply a concept!" # possible through API to accidentally not
+        assert concept, "Please supply a concept!" # possible through API to accidentally not
                                                   # but concept must be optional to maintain call signature
 
         self.accelerator = accelerator
