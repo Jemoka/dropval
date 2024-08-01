@@ -84,7 +84,7 @@ L = get_logger("dropval", log_level="DEBUG")
 
 class KN:
     def __init__(self, args, accelerator, model, tokenizer):
-        self.df = pd.read_csv(args.dataset)
+        self.df = pd.read_csv(args.data_dir / "paratrace.csv")
 
         self.accelerator = accelerator
 

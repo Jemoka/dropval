@@ -32,7 +32,7 @@ class Consistency:
     def __init__(self, args, accelerator, model, tokenizer):
         self.accelerator = accelerator
 
-        df = pd.read_csv(args.dataset)
+        df = pd.read_csv(args.data_dir / "paratrace.csv")
 
         class PararelConsistencyDataset(Dataset):
             def __init__(self, df):
