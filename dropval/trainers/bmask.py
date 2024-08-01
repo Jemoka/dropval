@@ -33,12 +33,11 @@ class BMaskTrainer:
         assert concept, "Please supply a concept!" # possible through API to accidentally not
                                                   # but concept must be optional to maintain call signature
 
-        self.epoch = 0
         self.args = args
-        generator, concepts = hydrate_bmask(args.data_dir / "paratrace.csv", args.val_split)
+        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", args.val_split)
         assert concept in concepts, "Please supply valid concept that corresponds to concept in DF."
 
-        self.save_dir = args.out_dir / args.intermediate_dir / f"bmask_{concept}"
+        self.save_dir = Path(args.out_dir) / args.intermediate_dir / f"bmask_{concept}"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         train, v1, v2 = generator(concept)
@@ -51,7 +50,6 @@ class BMaskTrainer:
         self.model = model
         set_requires_grad(False, self.model)
 
-        self.hidden_size = args.hidden_size
         self.tokenizer = tokenizer
         self.layers = []
         self.bmasks = []
@@ -71,7 +69,7 @@ class BMaskTrainer:
 
     @staticmethod
     def concepts(args):
-        generator, concepts = hydrate_bmask(args.data_dir / "paratrace.csv", args.val_split)
+        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", args.val_split)
 
         return concepts
 
@@ -241,7 +239,7 @@ class BMaskTrainer:
     def epoch(self):
         for indx, i in enumerate(iter(self.train_dl)):
             if self.global_step_counter_ > (self.args.epochs*len(self.train_dl)):
-                L.info("DONE WITH TRAINING")
+                L.info("SKIPPING EPOCH...")
                 break
 
             try:
@@ -251,7 +249,7 @@ class BMaskTrainer:
                 continue
 
             # if indx % 256 == 0:
-            if indx % 1024 == 0:
+            if indx % 256 == 0:
                 logs, es_target, es_loc = self.val()
                 self.accelerator.log(logs, step=self.global_step_counter_)
                 self.save(self.save_dir / "checkpoint")
@@ -264,7 +262,6 @@ class BMaskTrainer:
                 L.info(f"TRAIN | {indx}/{len(self.train_dl)} | loss {round(step, 3)}")
 
             self.global_step_counter_ += 1
-        self.epoch += 1
 
     def save(self, path):
         self.accelerator.save_state(path)
@@ -273,7 +270,6 @@ class BMaskTrainer:
                 "config": vars(self.args),
                 "steps": self.global_step_counter_,
                 "performance": self.best_val_,
-                "epochs": self.epoch,
             }, df)
 
     def load(self, path):
@@ -284,7 +280,6 @@ class BMaskTrainer:
         self.args = Namespace(**data.get("config", {}))
         self.global_step_counter_ = data.get("steps", 0)
         self.best_val_ = data.get("performance", float("-inf"))
-        self.epoch = data.get("epochs", 0)
         self.train_dl = self.accelerator.skip_first_batches(self.train_dl,
                                                             self.global_step_counter_)
 

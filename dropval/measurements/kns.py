@@ -84,7 +84,7 @@ class KN:
     def __init__(self, args, accelerator, model, tokenizer):
         self.args = args
 
-        consistency = args.out_dir / args.results_dir / "consistency.csv"
+        consistency = Path(args.out_dir) / args.results_dir / "consistency.csv"
         assert consistency.exists(), "run consistency task first, we need its outputs"
 
         self.df = pd.read_csv(consistency)
@@ -93,7 +93,7 @@ class KN:
 
         self.lm = LanguageModel(model=model, tokenizer=tokenizer).to(self.accelerator.device)
 
-        out_path = args.out_dir / args.results_dir / "kns"
+        out_path = Path(args.out_dir) / args.results_dir / "kns"
         out_path.mkdir(parents=True, exist_ok=True)
 
         self.__out_file_s1 = out_path / "kns.json"

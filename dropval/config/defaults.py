@@ -28,10 +28,7 @@ def load(args):
     # make output dir
     actual_out_dir = (Path(args.out_dir) / args.experiment)
     actual_out_dir.mkdir(parents=True, exist_ok=True)
-    args.out_dir = actual_out_dir
-
-    # hydrate data dir
-    args.data_dir = Path(args.data_dir)
+    args.out_dir = str(actual_out_dir)
 
     model, tokenizer, config = load_base(args)
     args.__dict__["model_config"] = config

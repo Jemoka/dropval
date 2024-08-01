@@ -2,6 +2,8 @@ from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer
 from dropval.measurements import BMask, Consistency, KN
 from dropval.utils import get_accelerator
 
+from pathlib import Path
+
 from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
 
@@ -9,7 +11,7 @@ L = get_logger("dropval", log_level="DEBUG")
 def dispatch_bmask_(args, accelerator, model, tokenizer):
     # for each concept, if it isn't prepared already, prepare it
     for concept in BMaskTrainer.concepts(args):
-        if (args.out_dir / args.results_dir / "bmask"  / f"bmask_{concept}").exists():
+        if (Path(args.out_dir) / args.results_dir / "bmask"  / f"bmask_{concept}").exists():
             continue
 
         trainer = BMaskTrainer(args, accelerator, model, tokenizer, concept)

@@ -32,7 +32,7 @@ class Consistency:
     def __init__(self, args, accelerator, model, tokenizer):
         self.accelerator = accelerator
 
-        df = pd.read_csv(args.data_dir / "paratrace.csv")
+        df = pd.read_csv(Path(args.data_dir) / "paratrace.csv")
 
         class PararelConsistencyDataset(Dataset):
             def __init__(self, df):
@@ -51,8 +51,8 @@ class Consistency:
         self.model = model.to(self.device)
         self.tokenizer = tokenizer
 
-        self.__out_file = args.out_dir / args.results_dir / "consistency.csv"
-        (args.out_dir / args.results_dir).mkdir(parents=True, exist_ok=True)
+        self.__out_file = Path(args.out_dir) / args.results_dir / "consistency.csv"
+        (Path(args.out_dir) / args.results_dir).mkdir(parents=True, exist_ok=True)
 
     @property
     def device(self):

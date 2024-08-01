@@ -53,6 +53,9 @@ if __name__ == "__main__":
     parser.add_argument("--decay", type=float, default = 0.9)
     parser.add_argument("--warmup", type=float, default = 0.1)
 
+    # bmask specific configs
+    parser.add_argument("--hidden_size", type=int, default = 1920)
+
     # settings to be hydrated    
     parser.add_argument("--lr", type=float, default = None)
     parser.add_argument("--epochs", type=float, default = None)
