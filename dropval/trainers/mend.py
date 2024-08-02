@@ -141,25 +141,32 @@ class MENDTrainer:
 
     def val(self):
         self.eval()
-        edit_successes = torch.tensor([]).to(self.device)
-        edit_successes_p = torch.tensor([]).to(self.device)
-        target_prob_diffes = torch.tensor([]).to(self.device)
+        edit_successes = 0
+        edit_successes_p = 0
+        target_prob_diffes = 0
+
+        count_es = 0
+        count_esp = 0
+        count_tbd = 0
 
         for indx, i in enumerate(iter(self.val_dl)):
             if indx % 100 == 0:
                 L.info(f"VAL | {indx}/{len(self.val_dl)}")
 
-            xs = i["xs"]
-            ys = i["ys"]
-            ((res, res_alt), (target_prob, target_alt_prob),
-            (argmax_idx, argmax_alt_idx),
-            target) = self(xs, ys)
+            try:
+                xs = i["xs"]
+                ys = i["ys"]
+                ((res, res_alt), (target_prob, target_alt_prob),
+                (argmax_idx, argmax_alt_idx),
+                target) = self(xs, ys)
 
-            xs = i["xs"]
-            ys = i["ys"]
-            xp = i["xloc"]
-            yp = i["yloc"]
-            ((resp, resp_alt), __, ___, ____) = self(xs, ys, xp, yp)
+                xs = i["xs"]
+                ys = i["ys"]
+                xp = i["xloc"]
+                yp = i["yloc"]
+                ((resp, resp_alt), __, ___, ____) = self(xs, ys, xp, yp)
+            except (ValueError, IndexError) as e:
+                continue
 
             tokenized = self.tokenizer(ys, return_tensors="pt", padding=True).to(self.device)
             tokenized_p = self.tokenizer(yp, return_tensors="pt", padding=True).to(self.device)
@@ -171,13 +178,17 @@ class MENDTrainer:
 
             target_prob_diff = (target_alt_prob - target_prob).squeeze(dim=1)
 
-            edit_successes = torch.cat([edit_successes, edit_sucess])
-            target_prob_diffes = torch.cat([target_prob_diffes, target_prob_diff])
-            edit_successes_p = torch.cat([edit_successes_p, edit_sucess_loc])
+            edit_successes += edit_sucess.float().sum().cpu().item()
+            target_prob_diffes += target_prob_diff.float().sum().cpu().item()
+            edit_successes_p += edit_sucess_loc.float().sum().cpu().item()
 
-        es = edit_successes.float().mean().cpu().item()
-        esp = edit_successes_p.float().mean().cpu().item()
-        tbp = target_prob_diffes.mean().cpu().item()
+            count_es += len(edit_sucess)
+            count_esp += len(edit_sucess_loc)
+            count_tbd += len(target_prob_diff)
+
+        es = (edit_successes / count_es)
+        esp = (edit_successes_p / count_esp)
+        tbp = (target_prob_diffes / count_tbd)
 
         L.info(f"VAL | DONE | edit success {round(es, 3)} | edit success localization {round(esp, 3)} | target prob diff {round(tbp, 3)}")
 

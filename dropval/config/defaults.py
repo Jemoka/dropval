@@ -9,7 +9,7 @@ DEFAULTS = {
     },
     "mend": {
         "lr": 0.0001,
-        "epochs": 4,
+        "epochs": 8,
         "batch_size": 16
     },
     "squad": {
