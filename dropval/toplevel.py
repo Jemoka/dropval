@@ -27,17 +27,25 @@ def dispatch_bmask_(args, accelerator, model, tokenizer):
         evaluator()
 
 def dispatch_mend_(args, accelerator, model, tokenizer):
+    if (Path(args.out_dir) / args.results_dir / "mend.json").exists():
+        L.info("MEND DONE... SKIPPING")
+        return
+
     trainer = MENDTrainer(args, accelerator, model, tokenizer)
     for i in range(args.epochs):
         L.info(f"EPOCH | MEND | {i} / {args.epochs}")
-        trainer.epoch()
+        trainer.epoch(i)
     trainer.finish()
 
 def dispatch_squad_(args, accelerator, model, tokenizer):
+    if (Path(args.out_dir) / args.results_dir / "squad.json").exists():
+        L.info("SQUAD DONE... SKIPPING")
+        return
+
     trainer = SquadTrainer(args, accelerator, model, tokenizer)
     for i in range(args.epochs):
         L.info(f"EPOCH | SQUAD | {i} / {args.epochs}")
-        trainer.epoch()
+        trainer.epoch(i)
     trainer.finish()
 
 def dispatch_consistency_(args, accelerator, model, tokenizer):

@@ -24,13 +24,14 @@ L = get_logger("dropval", log_level="DEBUG")
 import tempfile
 
 from argparse import Namespace
+from pathlib import Path
 
 from torch.utils.data import IterableDataset
 from transformers import default_data_collator
 
 class SquadTrainer:
     def __init__(self, config, accelerator, model, tokenizer):
-        save_dir = config.out_dir / config.intermediate_dir / "squad"
+        save_dir = Path(config.out_dir) / config.intermediate_dir / "squad"
         save_dir.mkdir(parents=True, exist_ok=True)
 
         self.save_dir = str(save_dir / "checkpoint")
@@ -40,7 +41,8 @@ class SquadTrainer:
 
         self.accelerator = accelerator
 
-        self.model = model
+        # we do args.model to initialize new weights
+        self.model = AutoModelForQuestionAnswering.from_pretrained(config.base)
         self.tokenizer = tokenizer
         self.model.train()
 
@@ -65,6 +67,7 @@ class SquadTrainer:
         self.val_dl = DataLoader(self.dev_set, # IMPORTANT: keep shuffle off for val to work
                                  batch_size=config.batch_size)
 
+        self.total_batches = len(self.train_dl)
 
         self.optim = AdamW(self.model.parameters(), lr=config.lr,
                            betas=(0.9,0.999), eps=1e-6, weight_decay=0.01)
@@ -86,17 +89,21 @@ class SquadTrainer:
             self.load(self.save_dir)
 
         
-    def epoch(self):
+    def epoch(self, eid=None):
         if self.accelerator.is_main_process:
             wandb.watch(self.model)
 
+        train_dl = self.accelerator.skip_first_batches(self.train_dl,
+                self.global_step_counter_ % self.total_batches)
+
+        if eid != None:
+            if self.global_step_counter_ >= ((eid+1)*self.total_batches):
+                L.info("SKIPPING EPOCH...")
+                return
+
         config = self.config
 
-        for indx, batch in enumerate(iter(self.train_dl)):
-            if self.global_step_counter_ > (self.config.epochs*len(self.train_dl)):
-                L.info("DONE WITH TRAINING")
-                break
-
+        for indx, batch in enumerate(iter(train_dl)):
             if indx % 1024 == 0:
                 # we can do this because we are not training more than
                 # one epoch
@@ -109,7 +116,7 @@ class SquadTrainer:
 
                 self.save(self.save_dir)
                 self.accelerator.log(val, step=self.global_step_counter_)
-                L.info(f"VAL | exact match {round(val['val_exact'], 3)} | f1 {round(val['val/f1'], 3)}",
+                L.info(f"VAL | exact match {round(val['squad/val/exact'], 3)} | f1 {round(val['squad/val/f1'], 3)}",
                        main_process_only=True)
 
 
@@ -130,11 +137,11 @@ class SquadTrainer:
 
             self.global_step_counter_ += 1
 
-    def finish():
+    def finish(self):
         # and write results
         args = self.config
-        (args.out_dir / args.results_dir).mkdir(parents=True, exist_ok=True)
-        out_path = args.out_dir / args.results_dir / "squad.json"
+        (Path(args.out_dir) / args.results_dir).mkdir(parents=True, exist_ok=True)
+        out_path = Path(args.out_dir) / args.results_dir / "squad.json"
 
         # load best dir and calculate final results
         self.load(self.best_dir)
@@ -142,7 +149,7 @@ class SquadTrainer:
 
         # write to file
         with open(out_path, 'w') as df:
-            json.dump(results, df)
+            json.dump(results, df, indent=4)
 
         self.accelerator.end_training()
 

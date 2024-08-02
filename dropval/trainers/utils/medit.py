@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from pathlib import Path
 
-MASK = "<mask>"
+MASK = "[MASK]"
 
 class ParatraceConceptSplitDataset(Dataset):
     def __init__(self, df):
@@ -24,7 +24,12 @@ class ParatraceConceptSplitDataset(Dataset):
         return len(self.df)
 
 
-def hydrate_bmask(url, p=0.1):
+def hydrate_bmask(url, p=0.1, mask=MASK):
+    global MASK 
+
+    # in case people change it
+    MASK = mask
+
     df = pd.read_csv(url)
     targets = df.target.value_counts().index
 
@@ -81,28 +86,37 @@ class DatasetPrefetchWrapper(Dataset):
     def __init__(self, ds):
         self.data = [ds[i] for i in tqdm(range(len(ds)))]
         self.data = [i for i in self.data if i != None]
+        self.mask_ = MASK
     def __len__(self):
         return len(self.data)
     def __getitem__(self, x):
         dat = self.data[x]
+
         return {
-            "xs": dat["xs"].replace("[MASK]", MASK),
-            "xp": dat["xp"].replace("[MASK]", MASK),
-            "xloc": dat["xloc"].replace("[MASK]", MASK),
+            "xs": dat["xs"].replace("[MASK]", self.mask_),
+            "xp": dat["xp"].replace("[MASK]", self.mask_),
+            "xloc": dat["xloc"].replace("[MASK]", self.mask_),
             "ys": dat["ys"],
             "yp": dat["yp"],
             "yloc": dat["yloc"],
         }
 
-def hydrate_mend(url, p=0.1):
+def hydrate_mend(url, p=0.1, mask=MASK):
+    global MASK 
+    MASK = mask
+
     url_train = Path(url.replace("csv", f"{p}.train"))
     url_val = Path(url.replace("csv", f"{p}.val"))
+
 
     if url_train.exists() and url_val.exists():
         with open(url_val, 'rb') as d:
             ds_val = pickle.load(d)
         with open(url_train, 'rb') as d:
             ds = pickle.load(d)
+        ds.mask_ = mask
+        ds_val.mask_ = mask
+
         return ds, ds_val
 
     df = pd.read_csv(url)
@@ -120,5 +134,8 @@ def hydrate_mend(url, p=0.1):
     ds = DatasetPrefetchWrapper(ParatraceConsistencyDataset(df))
     with open(url_train, 'wb') as d:
         pickle.dump(ds, d)
+
+    ds.mask_ = mask
+    ds_val.mask_ = mask
 
     return ds, ds_val

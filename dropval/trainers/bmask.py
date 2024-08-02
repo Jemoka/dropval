@@ -34,10 +34,12 @@ class BMaskTrainer:
                                                   # but concept must be optional to maintain call signature
 
         self.args = args
-        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", args.val_split)
+        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", 
+                                            args.val_split,
+                                            mask=args.model_config["mask"])
         assert concept in concepts, "Please supply valid concept that corresponds to concept in DF."
 
-        self.save_dir = Path(args.out_dir) / args.intermediate_dir / f"bmask_{concept}"
+        self.save_dir = Path(args.out_dir) / args.intermediate_dir / "bmask" / f"bmask_{concept}"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         train, v1, v2 = generator(concept)
@@ -71,7 +73,8 @@ class BMaskTrainer:
 
     @staticmethod
     def concepts(args):
-        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", args.val_split)
+        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", args.val_split,
+                                            mask=args.model_config["mask"])
 
         return concepts
 
@@ -243,7 +246,7 @@ class BMaskTrainer:
                 self.global_step_counter_ % self.total_batches)
 
         if eid != None:
-            if self.global_step_counter_ > (eid*self.total_batches):
+            if self.global_step_counter_ >= ((eid+1)*self.total_batches):
                 L.info("SKIPPING EPOCH...")
                 return
 

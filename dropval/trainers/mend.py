@@ -31,15 +31,18 @@ L = get_logger("dropval", log_level="DEBUG")
 
 class MENDTrainer:
     def __init__(self, args, accelerator, model, tokenizer):
-        self.save_dir = args.out_dir / args.intermediate_dir / "mend"
+        self.save_dir = Path(args.out_dir) / args.intermediate_dir / "mend"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
 
         self.args = args
-        train_ds, val_ds = hydrate_mend(args.data_dir / "paratrace.csv", args.val_split)
+        train_ds, val_ds = hydrate_mend(str(Path(args.data_dir) / "paratrace.csv"), 
+                                        args.val_split, mask=args.model_config["mask"])
 
         self.train_dl = DataLoader(train_ds, args.batch_size, shuffle=True)
         self.val_dl = DataLoader(val_ds, args.batch_size, shuffle=True)
+
+        self.total_batches = len(self.train_dl)
 
         self.accelerator = accelerator
 
@@ -229,12 +232,16 @@ class MENDTrainer:
 
         return (res, res_alt), (target_prob, target_alt_prob), (argmax_idx, argmax_alt_idx), target.squeeze(1)
 
-    def epoch(self):
-        for indx, i in enumerate(iter(self.train_dl)):
-            if self.global_step_counter_ > (self.args.epochs*len(self.train_dl)):
-                L.info("DONE WITH TRAINING")
-                break
+    def epoch(self, eid=None):
+        train_dl = self.accelerator.skip_first_batches(self.train_dl,
+                self.global_step_counter_ % self.total_batches)
 
+        if eid != None:
+            if self.global_step_counter_ >= ((eid+1)*self.total_batches):
+                L.info("SKIPPING EPOCH...")
+                return
+
+        for indx, i in enumerate(iter(train_dl)):
             try:
                 step = self.step((i["xs"], i["ys"]),
                                  (i["xp"], i["yp"]),
@@ -254,7 +261,7 @@ class MENDTrainer:
 
             if indx % 16 == 0:
                 self.accelerator.log({"mend/training/loss": step}, step=self.global_step_counter_)
-                L.info(f"TRAIN | {indx}/{len(self.train_dl)} | loss {round(step, 3)}")
+                L.info(f"TRAIN | {indx} | {len(self.train_dl)-(self.global_step_counter_ % self.total_batches)} | loss {round(step, 3)}")
 
             self.global_step_counter_ += 1
 
@@ -277,19 +284,19 @@ class MENDTrainer:
         self.global_step_counter_ = data.get("steps", 0)
         self.best_val_ = data.get("performance", float("-inf"))
 
-    def finish():
+    def finish(self):
         # and write results
-        arg = self.args
-        (args.out_dir / args.results_dir).mkdir(parents=True, exist_ok=True)
-        out_path = args.out_dir / args.results_dir / "mend.json"
+        args = self.args
+        (Path(args.out_dir) / args.results_dir).mkdir(parents=True, exist_ok=True)
+        out_path = Path(args.out_dir) / args.results_dir / "mend.json"
 
         # load best dir and calculate final results
-        self.load(self.best_dir)
+        self.load(self.save_dir / "best")
         results = self.val()[0]
 
         # write to file
         with open(out_path, 'w') as df:
-            json.dump(results, df)
+            json.dump(results, df, indent=4)
 
         self.accelerator.end_training()
 
