@@ -294,6 +294,7 @@ class MENDTrainer:
         self.args = Namespace(**data.get("config", {}))
         self.global_step_counter_ = data.get("steps", 0)
         self.best_val_ = data.get("performance", float("-inf"))
+        L.debug(f"loaded checkpoint at {path}")
 
     def finish(self):
         # and write results
