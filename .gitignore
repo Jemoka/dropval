@@ -5,3 +5,6 @@ data
 *.pyc
 *#
 wandb
+*.out
+*.swp
+

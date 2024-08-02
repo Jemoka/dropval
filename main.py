@@ -43,9 +43,6 @@ if __name__ == "__main__":
     parser.add_argument("--results_dir", type=str, default="./results")
     parser.add_argument("--data_dir", type=str, default="./data/")
 
-    # training config
-    parser.add_argument("--val_split", type=float, default=0.1)
-
     # bmask specific configs
     parser.add_argument("--beta", type=float, default = 1e-5)
 
@@ -60,6 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default = None)
     parser.add_argument("--epochs", type=float, default = None)
     parser.add_argument("--batch_size", type=float, default = None)
+    parser.add_argument("--val_split", type=float, default=None)
 
     # read user request
     args = parser.parse_args()
