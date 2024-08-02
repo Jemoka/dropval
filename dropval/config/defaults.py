@@ -11,7 +11,7 @@ DEFAULTS = {
     "mend": {
         "lr": 0.0001,
         "epochs": 8,
-        "batch_size": 16,
+        "batch_size": 10,
         "val_split": 0.05
     },
     "squad": {
