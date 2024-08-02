@@ -1,0 +1,20 @@
+* dropval
+How well does your Roberta/BERT do at self consistency tasks? IDK. Maybe you
+want to find out?
+
+#+begin_src bash
+python main.py my_funni_experiment ${TASK} ./path/to/a/roberta/or/bert --wandb
+#+end_src
+
+where =$TASK= is your choice of =bmask= (https://arxiv.org/abs/2010.02066),
+=mend= (https://arxiv.org/abs/2110.11309), =squad=
+(https://arxiv.org/abs/1606.05250), =consistency=
+(https://arxiv.org/pdf/2102.01017), or =kn=
+(https://arxiv.org/abs/2104.08696).
+
+Coming soon is also ReFT or LoRA.
+
+
+good vibes
+
+
