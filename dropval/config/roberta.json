@@ -14,6 +14,16 @@
         ]
         
     ],
+    "reft_layers": [
+        (4, "roberta.encoder.layer[4].output"),
+        (6, "roberta.encoder.layer[6].output"),
+        (8, "roberta.encoder.layer[8].output"),
+        (12, "roberta.encoder.layer[12].output"),
+        (16, "roberta.encoder.layer[16].output"),
+        (18, "roberta.encoder.layer[18].output"),
+        (22, "roberta.encoder.layer[22].output"),
+        (23, "roberta.encoder.layer[23].output"),
+    ],
     "bmask_layers": [
         "roberta.encoder.layer.0.output",
         "roberta.encoder.layer.1.output",

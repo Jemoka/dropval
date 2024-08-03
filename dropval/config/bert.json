@@ -13,6 +13,12 @@
             "bert.encoder.layer.11.output"
         ]
     ],
+    "reft_layers": [
+        (4, "bert.encoder.layer[4].output"),
+        (6, "bert.encoder.layer[6].output"),
+        (8, "bert.encoder.layer[8].output"),
+        (11, "bert.encoder.layer[11].output"),
+    ],
     "bmask_layers": [
         "bert.encoder.layer.0.output",
         "bert.encoder.layer.1.output",

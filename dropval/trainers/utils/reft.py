@@ -45,3 +45,24 @@ def prepare_training_data(x, y, model, tokenizer, num_layers, intervene_tokens=1
 
     return dataset, data_collator_fn
 
+
+def run_reft(intervenable, step):
+    unit_locations = None
+    if "intervention_locations" in step:
+        unit_locations={
+            "sources->base": (
+                None,
+                step["intervention_locations"].permute(1, 0, 2).tolist()
+            )
+        }
+
+    _, cf_outputs = intervenable(
+        {
+            "input_ids": step["input_ids"],
+            "attention_mask": step["attention_mask"]
+        },
+        unit_locations=unit_locations,
+        labels=step.get("labels")
+    )
+
+    return cf_outputs
