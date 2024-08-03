@@ -53,11 +53,16 @@ if __name__ == "__main__":
     # bmask specific configs
     parser.add_argument("--hidden_size", type=int, default = 1920)
 
-    # settings to be hydrated    
+    # settings to be hydrated
     parser.add_argument("--lr", type=float, default = None)
     parser.add_argument("--epochs", type=float, default = None)
     parser.add_argument("--batch_size", type=float, default = None)
     parser.add_argument("--val_split", type=float, default=None)
+
+    # rank for LoRA and ReFT
+    parser.add_argument("--rank", type=int, default=4)
+    # number of tokens to intervene in prefix/suffix
+    parser.add_argument("--intervene_tokens", type=int, default=2)
 
     # read user request
     args = parser.parse_args()
