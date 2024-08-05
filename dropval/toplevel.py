@@ -1,4 +1,4 @@
-from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer
+from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer, ReFTrainer
 from dropval.measurements import BMask, Consistency, KN
 from dropval.utils import get_accelerator
 
@@ -7,6 +7,22 @@ from pathlib import Path
 from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
 
+def dispatch_reft_(args, accelerator, model, tokenizer):
+    # for each concept, if it isn't prepared already, prepare it
+    concepts = ReFTrainer.concepts(args)
+    for indx, concept in enumerate(concepts):
+        L.info(f"CONCEPT | REFT | {concept} | {indx} / {len(concepts)}")
+        if (Path(args.out_dir) / args.results_dir / "reft"  / f"reft_{concept}.json").exists():
+            L.info(f"CONCEPT | REFT | {concept} | SKIPPING")
+            continue
+
+        trainer = ReFTrainer(args, accelerator, model, tokenizer, concept)
+
+        for i in range(args.epochs):
+            L.info(f"EPOCH | REFT | {i} / {args.epochs}")
+            trainer.epoch(i)
+
+        trainer.finish()
 
 def dispatch_bmask_(args, accelerator, model, tokenizer):
     # for each concept, if it isn't prepared already, prepare it
@@ -68,6 +84,9 @@ def execute(args, model, tokenizer):
         dispatch_consistency_(args, accelerator, model, tokenizer)
     elif args.task.lower() == "kn":
         dispatch_kns_(args, accelerator, model, tokenizer)
+    elif args.task.lower() == "reft":
+        dispatch_reft_(args, accelerator, model, tokenizer)
+
 
 
 
