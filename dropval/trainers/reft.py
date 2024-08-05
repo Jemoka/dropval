@@ -178,6 +178,25 @@ class ReFTrainer:
 
         return logs, es, es_loc
 
+    def save(self, path):
+        self.accelerator.save_state(path)
+        with open(os.path.join(path, "config.json"), 'w') as df:
+            json.dump({
+                "config": vars(self.args),
+                "steps": self.global_step_counter_,
+                "performance": self.best_val_,
+            }, df)
+
+    def load(self, path):
+        self.accelerator.load_state(path)
+        with open(os.path.join(path, "config.json"), 'r') as df:
+            data = json.load(df)
+
+        self.args = Namespace(**data.get("config", {}))
+        self.global_step_counter_ = data.get("steps", 0)
+        self.best_val_ = data.get("performance", float("-inf"))
+
+
     def epoch(self, eid=None):
         train_dl = self.accelerator.skip_first_batches(self.train_dl,
                                                        self.global_step_counter_ % self.total_batches)
@@ -199,8 +218,8 @@ class ReFTrainer:
                 logs, es_target, es_loc = self.val()
                 self.accelerator.log(logs, step=self.global_step_counter_)
                 self.save(self.save_dir / "checkpoint")
-                if (es_target - es_loc) > self.best_val_:
-                    self.best_val_ = (es_target - es_loc)
+                if (es_target) > self.best_val_:
+                    self.best_val_ = (es_target)
                     self.save(self.save_dir / "best")
 
             if indx % 16 == 0:
