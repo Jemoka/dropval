@@ -1,6 +1,7 @@
 import torch, transformers, pyreft
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
+import pyvene as pv
 import pyreft
 from datasets import Dataset
 from torch.utils.data import DataLoader
@@ -78,7 +79,7 @@ class ReFTrainer:
                 for id, l in args.model_config["reft_layers"]
             ]
         )
-        self.model = self.accelerator.prepare(pyreft.get_reft_model(model, reft))
+        self.model = pyreft.get_reft_model(model, reft)
 
         if self.accelerator.is_main_process:
             if self.args.wandb:
@@ -180,6 +181,11 @@ class ReFTrainer:
 
     def save(self, path):
         self.accelerator.save_state(path)
+
+        save_dir = Path(path)/"intervention"
+        (save_dir).mkdir(exist_ok=True, parents=True)
+        self.model.save(save_directory=str(save_dir))
+
         with open(os.path.join(path, "config.json"), 'w') as df:
             json.dump({
                 "config": vars(self.args),
@@ -196,6 +202,18 @@ class ReFTrainer:
         self.global_step_counter_ = data.get("steps", 0)
         self.best_val_ = data.get("performance", float("-inf"))
 
+        model = AutoModelForMaskedLM.from_pretrained(self.args.base, 
+                torch_dtype=torch.bfloat16, device_map=self.device)
+        # this is because otherwise ReFT will winge about it because they
+        # assume I'm not MLMing, which means autoregression would therefore
+        # be a thing
+        del model.config.__dict__["use_cache"]
+        model = model.train()
+
+        self.model = pv.IntervenableModel.load(
+            str(Path(path)/"intervention"),
+            model = model
+        )
 
     def epoch(self, eid=None):
         train_dl = self.accelerator.skip_first_batches(self.train_dl,
