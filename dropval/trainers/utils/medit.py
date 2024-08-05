@@ -35,13 +35,42 @@ def hydrate_bmask(url, p=0.1, mask=MASK):
 
     def hydrate_inner(target):
         subset = df[df.target == target]
-        val = subset.sample(frac=p)
+        val = subset.sample(frac=p, random_state=7)
         train = subset[~subset.index.isin(val.index)]
         subset = df[df.target != target]
-        incong = subset.sample(n=len(val))
+        incong = subset.sample(n=len(val), random_state=7)
 
         val = ParatraceConceptSplitDataset(val)
         train = ParatraceConceptSplitDataset(train)
+        incong = ParatraceConceptSplitDataset(incong)
+
+        return train, val, incong
+
+    return hydrate_inner, targets.tolist()
+
+# this is to mix in localization and target samples into one
+# dataset
+def hydrate_reft(url, p=0.1, mask=MASK):
+    global MASK 
+
+    # in case people change it
+    MASK = mask
+
+    df = pd.read_csv(url)
+    targets = df.target.value_counts().index
+
+    def hydrate_inner(target):
+        subset = df[df.target == target]
+        val = subset.sample(frac=p, random_state=7)
+        train1 = subset[~subset.index.isin(val.index)]
+
+        subset = df[df.target != target]
+        incong = subset.sample(n=len(val), random_state=7)
+        train2 = subset[~subset.index.isin(incong.index)].sample(n=len(train1),
+                                                                 random_state=7)
+
+        val = ParatraceConceptSplitDataset(val)
+        train = ParatraceConceptSplitDataset(pd.concat([train1, train2]).sample(frac=1, random_state=7))
         incong = ParatraceConceptSplitDataset(incong)
 
         return train, val, incong

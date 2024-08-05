@@ -210,7 +210,7 @@ class ReFTrainer:
         del model.config.__dict__["use_cache"]
         model = model.train()
 
-        self.model = pv.IntervenableModel.load(
+        self.model = pyreft.ReftModel.load(
             str(Path(path)/"intervention"),
             model = model
         )
