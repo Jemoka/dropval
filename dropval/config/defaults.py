@@ -20,6 +20,12 @@ DEFAULTS = {
         "batch_size": 12,
         "val_split": 0.1
     },
+    "reft": {
+        "lr": 0.0005,
+        "epochs": 5,
+        "batch_size": 16,
+        "val_split": 0.1
+    },
     "consistency": {
         "lr": None,
         "epochs": None,

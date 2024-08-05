@@ -57,7 +57,8 @@ class ReFTrainer:
 
         self.accelerator = accelerator
 
-        model = AutoModelForMaskedLM.from_pretrained(args.base, torch_dtype=torch.bfloat16)
+        model = AutoModelForMaskedLM.from_pretrained(args.base, 
+                torch_dtype=torch.bfloat16, device_map=self.device)
         # this is because otherwise ReFT will winge about it because they
         # assume I'm not MLMing, which means autoregression would therefore
         # be a thing
@@ -86,14 +87,14 @@ class ReFTrainer:
         data1, collator1 = prepare_training_data([i["x"] for i in train],
                                                  [i["y"] for i in train],
                                                  self.model, tokenizer,
-                                                 len(args.model_config["reft_layer"]))
+                                                 len(args.model_config["reft_layers"]))
         self.train_dl = DataLoader(data1, collate_fn=collator1,
                                    batch_size=args.batch_size, shuffle=True)
 
         data2, collator2 = prepare_training_data([i["x"] for i in v1],
                                                  [i["y"] for i in v1],
                                                  self.model, tokenizer,
-                                                 len(args.model_config["reft_layer"]))
+                                                 len(args.model_config["reft_layers"]))
         self.val_dl_1 = DataLoader(data2, collate_fn=collator2,
                                    batch_size=args.batch_size, shuffle=True)
 
@@ -101,7 +102,7 @@ class ReFTrainer:
         data3, collator3 = prepare_training_data([i["x"] for i in v2],
                                                  [i["y"] for i in v2],
                                                  self.model, tokenizer,
-                                                 len(args.model_config["reft_layer"]))
+                                                 len(args.model_config["reft_layers"]))
         self.val_dl_2 = DataLoader(data3, collate_fn=collator3,
                                    batch_size=args.batch_size, shuffle=True)
 
@@ -109,7 +110,7 @@ class ReFTrainer:
         self.tokenizer = tokenizer
 
         (self.optim, self.train_dl,
-         self.val_dl_1, self.val_dl_2) = self.accelerator.prepare(Adam(self.model.parameters(), lr=self.lr),
+         self.val_dl_1, self.val_dl_2) = self.accelerator.prepare(Adam(self.model.parameters(), lr=args.lr),
                                                                   self.train_dl,
                                                                   self.val_dl_1, self.val_dl_2)
 
@@ -127,10 +128,10 @@ class ReFTrainer:
         return self.accelerator.device
 
     def train(self):
-        self.model = self.model.train()
+        self.model.train()
         return self
     def eval(self):
-        self.model = self.model.eval()
+        self.model.eval()
         return self
 
     def val(self):
@@ -156,8 +157,6 @@ class ReFTrainer:
         for indx, i in enumerate(iter(self.val_dl_2)):
             if indx % 100 == 0:
                 L.info(f"VAL | {indx+len(self.val_dl_1)}/{len(self.val_dl_1)+len(self.val_dl_2)}")
-            xs = i["x"]
-            ys = i["y"]
 
             result = self(**i)
             tokenized = i["labels"]
