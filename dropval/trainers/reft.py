@@ -288,8 +288,6 @@ class ReFTrainer:
         with open(out_path, 'w') as df:
             json.dump(results, df, indent=4)
 
-        self.accelerator.end_training()
-
     def step(self, step):
         result = self(**step)
 
