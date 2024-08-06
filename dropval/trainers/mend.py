@@ -145,10 +145,14 @@ class MENDTrainer:
         edit_successes = 0
         edit_successes_p = 0
         target_prob_diffes = 0
+        edit_successes_m = 0
+        edit_successes_mp = 0
 
         count_es = 0
         count_esp = 0
         count_tbd = 0
+        count_mes = 0
+        count_mesp = 0
 
         for indx, i in enumerate(iter(self.val_dl)):
             if indx % 100 == 0:
@@ -172,6 +176,9 @@ class MENDTrainer:
             tokenized = self.tokenizer(ys, return_tensors="pt", padding=True).to(self.device)
             tokenized_p = self.tokenizer(yp, return_tensors="pt", padding=True).to(self.device)
 
+            x_tokenized = self.tokenizer(xs, return_tensors="pt", padding=True).to(self.device)
+            x_tokenized_p = self.tokenizer(xp, return_tensors="pt", padding=True).to(self.device)
+
             edit_sucess = (tokenized["input_ids"] == res_alt.logits.argmax(dim=-1))[
                     tokenized["input_ids"] != self.tokenizer.pad_token_id]
             edit_sucess_loc = (tokenized_p["input_ids"] == resp_alt.logits.argmax(dim=-1))[
@@ -179,23 +186,39 @@ class MENDTrainer:
 
             target_prob_diff = (target_alt_prob - target_prob).squeeze(dim=1)
 
+            mask_idx = x_tokenized["input_ids"] == self.tokenizer.mask_token_id
+            rm = res_alt.logits.argmax(dim=-1)[mask_idx]
+            rm_labels = tokenized["input_ids"][mask_idx]
+
+            mask_idx = x_tokenized_p["input_ids"] == self.tokenizer.mask_token_id
+            rmp = resp_alt.logits.argmax(dim=-1)[mask_idx]
+            rmp_labels = tokenized_p["input_ids"][mask_idx]
+
             edit_successes += edit_sucess.float().sum().cpu().item()
-            target_prob_diffes += target_prob_diff.float().sum().cpu().item()
             edit_successes_p += edit_sucess_loc.float().sum().cpu().item()
+            edit_successes_m += (rm == rm_labels).float().sum().cpu().item()
+            edit_successes_mp += (rmp == rmp_labels).float().sum().cpu().item()
+            target_prob_diffes += target_prob_diff.float().sum().cpu().item()
 
             count_es += len(edit_sucess)
             count_esp += len(edit_sucess_loc)
+            count_mes += len(rm)
+            count_mesp += len(rmp)
             count_tbd += len(target_prob_diff)
 
         es = (edit_successes / count_es)
         esp = (edit_successes_p / count_esp)
+        mes = (edit_successes_m / count_mes)
+        mesp = (edit_successes_mp / count_mesp)
         tbp = (target_prob_diffes / count_tbd)
 
-        L.info(f"VAL | DONE | edit success {round(es, 3)} | edit success localization {round(esp, 3)} | target prob diff {round(tbp, 3)}")
+        L.info(f"VAL | DONE | edit success {round(mes, 3)}/{round(es, 3)} | edit success localization {round(mesp, 3)}/{round(esp, 3)} | target prob diff {round(tbp, 3)}")
 
         logs = {
             "mend/val/edit_success": es,
             "mend/val/edit_success_localization": esp,
+            "mend/val/mask_edit_success": mes,
+            "mend/val/mask_edit_success_localization": mesp,
             "mend/val/target_prob_diff": tbp,
         }
 
