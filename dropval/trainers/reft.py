@@ -59,7 +59,7 @@ class ReFTrainer:
         assert concept in concepts, "Please supply valid concept that corresponds to concept in DF."
         self.concept = concept
 
-        self.save_dir = Path(args.out_dir) / args.intermediate_dir / "reft" / f"reft_{concept}"
+        self.save_dir = Path(args.out_dir) / args.intermediate_dir / "reft" 
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         train, v1, v2 = generator(concept)

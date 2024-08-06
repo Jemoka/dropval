@@ -39,7 +39,7 @@ class BMaskTrainer:
                                             mask=args.model_config["mask"])
         assert concept in concepts, "Please supply valid concept that corresponds to concept in DF."
 
-        self.save_dir = Path(args.out_dir) / args.intermediate_dir / "bmask" / f"bmask_{concept}"
+        self.save_dir = Path(args.out_dir) / args.intermediate_dir / "bmask" 
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         train, v1, v2 = generator(concept)
