@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 from glob import glob
+import json
 
 from dropexp.utils import mean_confidence_interval, ks
 
@@ -88,7 +89,19 @@ def analyze_kns(dropout, dropfree):
     do_baseline_augment = ks(dropout_baseline_match_augment, dropout_baseline_no_match_augment)
     ndo_baseline_augment = ks(dropfree_baseline_match_augment, dropfree_baseline_no_match_augment)
 
+    do_concepts = str(dropout / "kns" / "kns.json")
+    do_knowledge = mean_confidence_interval(pd.read_json(do_concepts, orient="split").knowledge.apply(len))
+
+    df_concepts = str(dropfree / "kns" / "kns.json")
+    df_knowledge = mean_confidence_interval(pd.read_json(df_concepts, orient="split").knowledge.apply(len))
+    
     return  {
+        "neurons": {
+            "neuron_count_p95": {
+                "dropout": do_knowledge,
+                "no_dropout": df_knowledge,
+            }
+        },
         "clustering": {
             "clusters_p95": {
                 "dropout": do_clusters,

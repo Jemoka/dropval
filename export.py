@@ -2,52 +2,63 @@ from pathlib import Path
 import pandas as pd
 from glob import glob
 import json
+from collections import defaultdict
 
-from dropexp import analyze_kns
+from dropexp import analyze_kns, analyze_bmask, analyze_reft
+from dropexp.utils import mean_confidence_interval, ks
 
-DROPOUT = "./output/dropout"
-DROPFREE = "./output/no_dropout"
+import argparse
 
-dropout = Path(DROPOUT)
-dropfree = Path(DROPFREE)
-assert dropout.exists(), "the dropout data folder to analyze doesn't exist!"
-assert dropfree.exists(), "the dropfree data folder to analyze doesn't exist!"
+if __name__ == "__main__":
 
-final = {}
+    parser = argparse.ArgumentParser(
+                    prog='export',
+                    description='What the program does')
+    parser.add_argument('output', type=str)
+    parser.add_argument('--dropout', type=str, required=True)
+    parser.add_argument('--no_dropout', type=str, required=True)
+    args = parser.parse_args()
 
-# for kns, we want to see if randomly shuffled clusters have equal amounts
-# of success in terms of intervention
-if (dropout / "kns").exists() and (dropfree / "kns").exists():
-    final["kn"] = analyze_kns(dropout, dropfree)
+    DROPOUT = args.dropout
+    DROPFREE = args.no_dropout
+    OUTPUT = args.output
 
-# if (dropout / "bmask").exists() and (dropfree / "bmask").exists():
+    dropout = Path(DROPOUT)
+    dropfree = Path(DROPFREE)
+    assert dropout.exists(), "the dropout data folder to analyze doesn't exist!"
+    assert dropfree.exists(), "the dropfree data folder to analyze doesn't exist!"
 
-do_activations = []
-do_edit_successes = []
-do_edit_localizations = []
+    final = {}
 
-bmasks = glob(str(dropout / "bmask" / "*.json"))
-for bmask in bmasks:
-    with open(bmask, 'r') as df:
-        data = json.load(df)
-        do_activations.append(data["mean_activations"])
-        do_edit_successes.append(data["bmask_val"][1])
-        do_edit_localizations.append(data["bmask_val"][2])
+    # for kns, we want to see if randomly shuffled clusters have equal amounts
+    # of success in terms of intervention
+    if (dropout / "kns").exists() and (dropfree / "kns").exists():
+        final["kn"] = analyze_kns(dropout, dropfree)
 
+    if (dropout / "bmask").exists() and (dropfree / "bmask").exists():
+        final["bmask"] = analyze_bmask(dropout, dropfree)
 
-df_activations = []
-df_edit_successes = []
-df_edit_localizations = []
+    if (dropout / "reft").exists() and (dropfree / "reft").exists():
+        final["reft"] = analyze_reft(dropout, dropfree)
 
-bmasks = glob(str(dropfree / "bmask" / "*.json"))
-for bmask in bmasks:
-    with open(bmask, 'r') as df:
-        data = json.load(df)
-        df_activations.append(data["mean_activations"])
-        df_edit_successes.append(data["bmask_val"][1])
-        df_edit_localizations.append(data["bmask_val"][2])
+    if (dropout / "consistency.csv").exists():
+        df = pd.read_csv(str(dropout/"consistency.csv"))
+        df.pred_tokens = df.pred_tokens.apply(lambda x:x.replace("Ġ", "").strip())
+        repr_do = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
+        do_consistency = mean_confidence_interval(repr_do)
 
+        df = pd.read_csv(str(dropfree/"consistency.csv"))
+        df.pred_tokens = df.pred_tokens.apply(lambda x:str(x).replace("Ġ", "").strip())
+        repr_df = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
+        df_consistency = mean_confidence_interval(repr_df)
 
-df_activations
-do_activations
+        final["consistency"] = {
+            "num_representations_p95": {
+                "dropout": do_consistency,
+                "no_dropout": df_consistency
+            }
+        }
+
+    with open(OUTPUT, 'w') as df:
+        json.dump(final, df, indent=4)
 
