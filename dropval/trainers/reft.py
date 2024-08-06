@@ -259,14 +259,14 @@ class ReFTrainer:
             # if indx % 256 == 0:
             if indx % 256 == 0:
                 logs, es_target, es_loc = self.val()
-                self.accelerator.log(logs, step=self.global_step_counter_)
+                # self.accelerator.log(logs, step=self.global_step_counter_)
                 self.save(self.save_dir / "checkpoint")
                 if (es_target) > self.best_val_:
                     self.best_val_ = (es_target)
                     self.save(self.save_dir / "best")
 
             if indx % 16 == 0:
-                self.accelerator.log({"reft/training/loss": step}, step=self.global_step_counter_)
+                # self.accelerator.log({"reft/training/loss": step}, step=self.global_step_counter_)
                 L.info(f"TRAIN | {indx} | {len(self.train_dl)-self.global_step_counter_ % self.total_batches} | loss {round(step, 3)}")
 
             self.global_step_counter_ += 1

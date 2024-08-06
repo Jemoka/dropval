@@ -23,7 +23,7 @@ DEFAULTS = {
     "reft": {
         "lr": 0.0005,
         "epochs": 1,
-        "batch_size": 16,
+        "batch_size": 10,
         "val_split": 0.1
     },
     "consistency": {
