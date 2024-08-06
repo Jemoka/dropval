@@ -141,6 +141,7 @@ class MENDTrainer:
 
     def val(self):
         self.eval()
+
         edit_successes = 0
         edit_successes_p = 0
         target_prob_diffes = 0

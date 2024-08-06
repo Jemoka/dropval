@@ -16,7 +16,7 @@ import wandb
 from torch.optim import Adam 
 import torch.nn.functional as F
 
-from dropval.trainers.utils.medit import hydrate_bmask
+from dropval.trainers.utils.medit import hydrate_reft
 
 import os
 from torch.utils.data.dataloader import DataLoader, Dataset
@@ -43,8 +43,9 @@ class ReFTrainer:
                                                   # but concept must be optional to maintain call signature
 
         self.args = args
+        self.base = model
         # yes because that actually works for this exact talk
-        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", 
+        generator, concepts = hydrate_reft(Path(args.data_dir) / "paratrace.csv", 
                                             args.val_split,
                                             mask = args.model_config["mask"])
         assert concept in concepts, "Please supply valid concept that corresponds to concept in DF."
@@ -139,6 +140,7 @@ class ReFTrainer:
         self.eval()
 
         edit_successes = torch.tensor([]).to(self.device)
+        mask_successes = torch.tensor([]).to(self.device)
 
         for indx, i in enumerate(iter(self.val_dl_1)):
             if indx % 100 == 0:
@@ -149,11 +151,17 @@ class ReFTrainer:
             edit_sucess = (tokenized == result.logits.argmax(dim=-1))[
                 i["input_ids"] != self.tokenizer.pad_token_id]
 
+            predictions = result.logits.argmax(dim=-1)[(i["input_ids"] == self.tokenizer.mask_token_id)]
+            labels = i["labels"][(i["input_ids"] == self.tokenizer.mask_token_id)]
+
             edit_successes = torch.cat([edit_successes, edit_sucess])
+            mask_successes = torch.cat([mask_successes, predictions==labels])
 
         es = edit_successes.float().mean().cpu().item()
+        mes = mask_successes.float().mean().cpu().item()
 
         edit_successes_loc = torch.tensor([]).to(self.device)
+        mask_successes_loc = torch.tensor([]).to(self.device)
 
         for indx, i in enumerate(iter(self.val_dl_2)):
             if indx % 100 == 0:
@@ -164,15 +172,23 @@ class ReFTrainer:
             edit_sucess = (tokenized == result.logits.argmax(dim=-1))[
                 i["input_ids"] != self.tokenizer.pad_token_id]
 
+
+            predictions = result.logits.argmax(dim=-1)[(i["input_ids"] == self.tokenizer.mask_token_id)]
+            labels = i["labels"][(i["input_ids"] == self.tokenizer.mask_token_id)]
+
             edit_successes_loc = torch.cat([edit_successes_loc, edit_sucess])
+            mask_successes_loc = torch.cat([mask_successes_loc, predictions==labels])
 
         es_loc = edit_successes_loc.float().mean().cpu().item()
+        mes_loc = mask_successes_loc.float().mean().cpu().item()
 
-        L.info(f"VAL | DONE | edit success {round(es, 3)} | edit succes (unrelated) {round(es_loc, 3)}")
+        L.info(f"VAL | DONE | edit success {round(mes, 3)}/{round(es, 3)} | edit succes (unrelated) {round(mes_loc, 3)}/{round(es_loc, 3)}")
 
         logs = {
             "reft/val/edit_success": es,
             "reft/val/edit_localization": es_loc,
+            "reft/val/mask_edit_success": mes,
+            "reft/val/mask_edit_localization": mes_loc,
         }
 
         self.train()
@@ -276,7 +292,7 @@ class ReFTrainer:
 
     @staticmethod
     def concepts(args):
-        generator, concepts = hydrate_bmask(Path(args.data_dir) / "paratrace.csv", args.val_split,
+        generator, concepts = hydrate_reft(Path(args.data_dir) / "paratrace.csv", args.val_split,
                                             mask=args.model_config["mask"])
 
         return concepts

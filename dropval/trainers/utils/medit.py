@@ -60,11 +60,11 @@ def hydrate_reft(url, p=0.1, mask=MASK):
     targets = df.target.value_counts().index
 
     def hydrate_inner(target):
-        subset = df[df.target == target]
+        subset = df[(df.target == target)]
         val = subset.sample(frac=p, random_state=7)
         train1 = subset[~subset.index.isin(val.index)]
 
-        subset = df[df.target != target]
+        subset = df[(df.target != target)]
         incong = subset.sample(n=len(val), random_state=7)
         train2 = subset[~subset.index.isin(incong.index)].sample(n=len(train1),
                                                                  random_state=7)
@@ -76,6 +76,7 @@ def hydrate_reft(url, p=0.1, mask=MASK):
         return train, val, incong
 
     return hydrate_inner, targets.tolist()
+
 
 class ParatraceConsistencyDataset(Dataset):
     def __init__(self, df):
