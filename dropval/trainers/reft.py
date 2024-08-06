@@ -90,10 +90,6 @@ class ReFTrainer:
         )
         self.model = pyreft.get_reft_model(model, reft)
 
-        if self.accelerator.is_main_process:
-            if self.args.wandb:
-                wandb.watch(tuple(self.model))
-
         data1, collator1 = prepare_training_data([i["x"] for i in train],
                                                  [i["y"] for i in train],
                                                  self.model, tokenizer,
