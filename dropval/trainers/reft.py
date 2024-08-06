@@ -39,6 +39,14 @@ from dropval.trainers.utils.reft import prepare_training_data, run_reft
 class ReFTrainer:
     # we are actually ignoring the model because we have to reinitialize it to bf16
     def __init__(self, args, accelerator, model, tokenizer, concept=None):
+        # setup for model loading to not crash
+        # thank aryaman
+
+        pv.type_to_dimension_mapping[type(model)] = {
+            i[1]: ("hidden_size",) 
+            for i in args.model_config["reft_layers"]
+        }
+
         assert concept, "Please supply a concept!" # possible through API to accidentally not
                                                   # but concept must be optional to maintain call signature
 
@@ -200,7 +208,10 @@ class ReFTrainer:
 
         save_dir = Path(path)/"intervention"
         (save_dir).mkdir(exist_ok=True, parents=True)
+
+        self.model.set_device("cpu")
         self.model.save(save_directory=str(save_dir))
+        self.model.set_device(self.device)
 
         with open(os.path.join(path, "config.json"), 'w') as df:
             json.dump({
@@ -219,7 +230,7 @@ class ReFTrainer:
         self.best_val_ = data.get("performance", float("-inf"))
 
         model = AutoModelForMaskedLM.from_pretrained(self.args.base, 
-                torch_dtype=torch.bfloat16, device_map=self.device)
+                torch_dtype=torch.bfloat16, device_map="cpu")
         # this is because otherwise ReFT will winge about it because they
         # assume I'm not MLMing, which means autoregression would therefore
         # be a thing
@@ -230,6 +241,8 @@ class ReFTrainer:
             str(Path(path)/"intervention"),
             model = model
         )
+
+        self.model.set_device(self.device)
 
     def epoch(self, eid=None):
         train_dl = self.accelerator.skip_first_batches(self.train_dl,
