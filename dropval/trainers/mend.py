@@ -124,7 +124,10 @@ class MENDTrainer:
         with LinearParamGuard(layer, "dense", tape=True) as pg:
             input = self.tokenizer(xs, return_tensors="pt", padding=True).to(self.device)
             output = self.tokenizer(ys, return_tensors="pt", padding=True).to(self.device)
-            res = self.model(**input, labels=output["input_ids"])
+            out_ids = output["input_ids"]
+            # don't compute loss on padding
+            out_ids[out_ids==self.tokenizer.pad_token_id] = -100
+            res = self.model(**input, labels=out_ids)
 
             # get the paramguard tape for activations, sum down the batch and sequence dims
             u = einops.rearrange(pg.activations[0], "b i j -> (b i) j")

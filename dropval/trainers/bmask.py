@@ -308,7 +308,10 @@ class BMaskTrainer:
             mask_loc = (input_p["input_ids"] == self.tokenizer.mask_token_id)
             target = output_p["input_ids"][mask_loc].unsqueeze(1)
 
-            res = self.model(**input_p, labels=output_p["input_ids"])
+            labels = output_p["input_ids"]
+            # ignore padding
+            labels[labels==self.tokenizer.pad_token_id] = -100
+            res = self.model(**input_p, labels=labels)
 
         # compute regularization
         alpha = self.args.beta/self.args.batch_size
