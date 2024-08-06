@@ -2,6 +2,7 @@ from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer, ReFTrainer
 from dropval.measurements import BMask, Consistency, KN
 from dropval.utils import get_accelerator
 
+import shutil
 from pathlib import Path
 
 from accelerate.logging import get_logger
@@ -24,6 +25,9 @@ def dispatch_reft_(args, accelerator, model, tokenizer):
 
         trainer.finish()
 
+        # remove intermediate save dir beacuse we have generated the output
+        shutil.rmtree(trainer.save_dir)
+
 def dispatch_bmask_(args, accelerator, model, tokenizer):
     # for each concept, if it isn't prepared already, prepare it
     concepts = BMaskTrainer.concepts(args)
@@ -41,6 +45,9 @@ def dispatch_bmask_(args, accelerator, model, tokenizer):
 
         evaluator = BMask(args, accelerator, trainer, concept)
         evaluator()
+
+        # remove intermediate save dir beacuse we have generated the output
+        shutil.rmtree(trainer.save_dir)
 
 def dispatch_mend_(args, accelerator, model, tokenizer):
     if (Path(args.out_dir) / args.results_dir / "mend.json").exists():
