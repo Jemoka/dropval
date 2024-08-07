@@ -7,6 +7,8 @@ from collections import defaultdict
 from dropexp import analyze_kns, analyze_bmask, analyze_reft
 from dropexp.utils import mean_confidence_interval, ks
 
+from scipy.stats import ttest_rel
+
 import argparse
 
 if __name__ == "__main__":
@@ -56,9 +58,14 @@ if __name__ == "__main__":
             "num_representations_p95": {
                 "dropout": do_consistency,
                 "no_dropout": df_consistency
+            },
+            "paired_increase_in_consistency_pairedt": {
+                "statistic": ttest_rel(repr_df, repr_do).statistic,
+                "pval": ttest_rel(repr_df, repr_do).pvalue,
             }
         }
 
-    with open(OUTPUT, 'w') as df:
-        json.dump(final, df, indent=4)
+        with open(OUTPUT, 'w') as df:
+            json.dump(final, df, indent=4)
+
 
