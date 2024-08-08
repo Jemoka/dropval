@@ -25,8 +25,8 @@ if __name__ == "__main__":
     DROPFREE = args.no_dropout
     OUTPUT = args.output
 
-    dropout = Path(DROPOUT)
-    dropfree = Path(DROPFREE)
+    dropout = Path(DROPOUT) / "results"
+    dropfree = Path(DROPFREE) / "results"
     assert dropout.exists(), "the dropout data folder to analyze doesn't exist!"
     assert dropfree.exists(), "the dropfree data folder to analyze doesn't exist!"
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     if (dropout / "reft").exists() and (dropfree / "reft").exists():
         final["reft"] = analyze_reft(dropout, dropfree)
 
-    if (dropout / "consistency.csv").exists():
+    if (dropout / "consistency.csv").exists() and (dropfree / "consistency.csv").exists():
         df = pd.read_csv(str(dropout/"consistency.csv"))
         df.pred_tokens = df.pred_tokens.apply(lambda x:x.replace("Ġ", "").strip())
         repr_do = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             }
         }
 
-        with open(OUTPUT, 'w') as df:
-            json.dump(final, df, indent=4)
+    with open(OUTPUT, 'w') as df:
+        json.dump(final, df, indent=4)
 
 
