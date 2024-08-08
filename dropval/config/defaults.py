@@ -9,9 +9,9 @@ DEFAULTS = {
         "val_split": 0.1
     },
     "mend": {
-        "lr": 0.0001,
-        "epochs": 8,
-        "batch_size": 10,
+        "lr": 0.00005,
+        "epochs": 1,
+        "batch_size": 12,
         "val_split": 0.05
     },
     "squad": {
