@@ -59,6 +59,7 @@ class Consistency:
         return self.accelerator.device
 
     def __call__(self):
+        self.model = self.model.eval()
         final = defaultdict(list)
 
         mask_tok_str = self.tokenizer.mask_token

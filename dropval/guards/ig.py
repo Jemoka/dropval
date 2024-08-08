@@ -153,7 +153,7 @@ class LanguageModel:
             )
 
         self.tokenizer = tokenizer
-        self.model = model.eval()
+        self.model = model.train()
         set_requires_grad(False, self.model)
         self.layer_names = [
             n for n, m in model.named_modules()
