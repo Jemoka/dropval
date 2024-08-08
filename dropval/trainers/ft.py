@@ -67,7 +67,6 @@ class FineTuneTrainer:
         # this is because otherwise ReFT will winge about it because they
         # assume I'm not MLMing, which means autoregression would therefore
         # be a thing
-        del model.config.__dict__["use_cache"]
         self.model = self.model.train()
 
         class TokenizingDataSet(torch.utils.data.dataloader.Dataset):
