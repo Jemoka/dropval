@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
     # experiment
     parser.add_argument("experiment", type=str)
-    parser.add_argument("task", choices=["bmask", "mend", "squad", "kn", "consistency", "reft"])
+    parser.add_argument("task", choices=["bmask", "mend", "squad", "kn", "consistency", "reft", "ft"])
     parser.add_argument("base", type=str)
 
     # wandb

@@ -26,6 +26,12 @@ DEFAULTS = {
         "batch_size": 10,
         "val_split": 0.1
     },
+    "ft": {
+        "lr": 0.0001,
+        "epochs": 1,
+        "batch_size": 10,
+        "val_split": 0.1
+    },
     "consistency": {
         "lr": None,
         "epochs": None,

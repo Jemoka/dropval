@@ -1,4 +1,4 @@
-from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer, ReFTrainer
+from dropval.trainers import MENDTrainer, BMaskTrainer, SquadTrainer, ReFTrainer, FineTuneTrainer
 from dropval.measurements import BMask, Consistency, KN
 from dropval.utils import get_accelerator
 
@@ -7,6 +7,26 @@ from pathlib import Path
 
 from accelerate.logging import get_logger
 L = get_logger("dropval", log_level="DEBUG")
+
+def dispatch_ft_(args, accelerator, model, tokenizer):
+    # for each concept, if it isn't prepared already, prepare it
+    concepts = FineTuneTrainer.concepts(args)
+    for indx, concept in enumerate(concepts):
+        L.info(f"CONCEPT | FT | {concept} | {indx} / {len(concepts)}")
+        if (Path(args.out_dir) / args.results_dir / "reft"  / f"reft_{concept}.json").exists():
+            L.info(f"CONCEPT | FT | {concept} | SKIPPING")
+            continue
+
+        trainer = FineTuneTrainer(args, accelerator, model, tokenizer, concept)
+
+        for i in range(args.epochs):
+            L.info(f"EPOCH | FT | {i} / {args.epochs}")
+            trainer.epoch(i)
+
+        trainer.finish()
+
+        # remove intermediate save dir beacuse we have generated the output
+        shutil.rmtree(trainer.save_dir)
 
 def dispatch_reft_(args, accelerator, model, tokenizer):
     # for each concept, if it isn't prepared already, prepare it
@@ -93,6 +113,8 @@ def execute(args, model, tokenizer):
         dispatch_kns_(args, accelerator, model, tokenizer)
     elif args.task.lower() == "reft":
         dispatch_reft_(args, accelerator, model, tokenizer)
+    elif args.task.lower() == "ft":
+        dispatch_ft_(args, accelerator, model, tokenizer)
 
 
 
