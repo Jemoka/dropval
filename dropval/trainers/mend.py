@@ -47,6 +47,7 @@ class MENDTrainer:
         self.accelerator = accelerator
 
         self.model = model
+        self.model = self.model.train()
         set_requires_grad(False, self.model)
 
         self.hidden_size = args.hidden_size
