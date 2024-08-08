@@ -13,7 +13,7 @@ def dispatch_ft_(args, accelerator, model, tokenizer):
     concepts = FineTuneTrainer.concepts(args)
     for indx, concept in enumerate(concepts):
         L.info(f"CONCEPT | FT | {concept} | {indx} / {len(concepts)}")
-        if (Path(args.out_dir) / args.results_dir / "reft"  / f"reft_{concept}.json").exists():
+        if (Path(args.out_dir) / args.results_dir / "ft"  / f"ft_{concept}.json").exists():
             L.info(f"CONCEPT | FT | {concept} | SKIPPING")
             continue
 
