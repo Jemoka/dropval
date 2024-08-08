@@ -4,7 +4,7 @@ from dropval.utils import load_base
 DEFAULTS = {
     "bmask": {
         "lr": 0.01,
-        "epochs": 32,
+        "epochs": 5,
         "batch_size": 16,
         "val_split": 0.1
     },
