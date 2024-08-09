@@ -46,6 +46,57 @@ if __name__ == "__main__":
     if (dropout / "ft").exists() and (dropfree / "ft").exists():
         final["ft"] = analyze_reft(dropout, dropfree)
 
+    if (dropout / "squad.json").exists() and (dropfree / "squad.json").exists():
+        with open(dropfree / "squad.json", 'r') as d:
+            df = json.load(d)
+        df = {i.split("/")[-1]: j for i,j in df.items()}
+        with open(dropout / "squad.json", 'r') as d:
+            do = json.load(d)
+        do = {i.split("/")[-1]: j for i,j in do.items()}
+
+        final["squad"] = {
+            i+"_value": {
+                "dropout": do[i],
+                "no_dropout": df[i]
+            }
+            for i in df.keys()
+        }
+
+    if (dropout / "mend.json").exists() and (dropfree / "squad.json").exists():
+        with open(dropfree / "mend.json", 'r') as d:
+            df = json.load(d)
+        df = {i.split("/")[-1]: j for i,j in df.items()}
+        with open(dropout / "mend.json", 'r') as d:
+            do = json.load(d)
+        do = {i.split("/")[-1]: j for i,j in do.items()}
+
+        final["mend"] = {
+            "editing": {
+                "target_successes_value": {
+                    "dropout": do["edit_success"],
+                    "no_dropout": df["edit_success"],
+                },
+                "unrelated_sucesses_value": {
+                    "dropout": do["edit_success_localization"],
+                    "no_dropout": df["edit_success_localization"],
+                }
+            },
+            "masked_value_editing": {
+                "target_successes_value": {
+                    "dropout": do["mask_edit_success"],
+                    "no_dropout": df["mask_edit_success"],
+                },
+                "unrelated_sucesses_value": {
+                    "dropout": do["mask_edit_localization"],
+                    "no_dropout": df["mask_edit_localization"],
+                }
+            },
+            "target_probability_change": {
+                "dropout": do["target_prob_diff"],
+                "no_dropout": df["target_prob_diff"],
+            }
+        }
+
     if (dropout / "consistency.csv").exists() and (dropfree / "consistency.csv").exists():
         df = pd.read_csv(str(dropout/"consistency.csv"))
         df.pred_tokens = df.pred_tokens.apply(lambda x:x.replace("Ġ", "").strip())
