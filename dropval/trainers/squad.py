@@ -79,7 +79,7 @@ class SquadTrainer:
         self.scheduler = SequentialLR(self.optim, schedulers=[scheduler1, scheduler2], milestones=[warmup_steps])
 
         self.global_step_counter_ = 0
-        self.best_val_score_ = float("+inf")
+        self.best_val_score_ = float("-inf")
 
         (self.model, self.optim, self.train_dl, self.val_dl, self.scheduler) = self.accelerator.prepare(
             self.model, self.optim, self.train_dl, self.val_dl, self.scheduler)
