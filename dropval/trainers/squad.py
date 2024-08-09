@@ -104,7 +104,7 @@ class SquadTrainer:
         config = self.config
 
         for indx, batch in enumerate(iter(train_dl)):
-            if indx % 1024 == 0:
+            if indx % 2048 == 0:
                 # we can do this because we are not training more than
                 # one epoch
                 val = self.val()

@@ -87,8 +87,8 @@ if __name__ == "__main__":
                     "no_dropout": df["mask_edit_success"],
                 },
                 "unrelated_sucesses_value": {
-                    "dropout": do["mask_edit_localization"],
-                    "no_dropout": df["mask_edit_localization"],
+                    "dropout": do["mask_edit_success_localization"],
+                    "no_dropout": df["mask_edit_success_localization"],
                 }
             },
             "target_probability_change": {
