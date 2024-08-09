@@ -51,7 +51,7 @@ class BMaskTrainer:
         self.accelerator = accelerator
         self.model = model
 
-        self.model = self.model.train()
+        self.model = self.model.eval()
         set_requires_grad(False, self.model)
 
         self.tokenizer = tokenizer

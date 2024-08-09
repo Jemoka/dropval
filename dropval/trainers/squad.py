@@ -110,7 +110,7 @@ class SquadTrainer:
                 val = self.val()
                 loss = val["squad/val/f1"]+val["squad/val/exact"]
 
-                if loss < self.best_val_score_:
+                if loss > self.best_val_score_:
                     self.best_val_score_ = loss
                     self.save(self.best_dir)
 
