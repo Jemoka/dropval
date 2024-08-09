@@ -4,7 +4,7 @@ from glob import glob
 import json
 from collections import defaultdict
 
-from dropexp import analyze_kns, analyze_bmask, analyze_reft
+from dropexp import analyze_kns, analyze_bmask, analyze_reft, analyze_ft
 from dropexp.utils import mean_confidence_interval, ks
 
 from scipy.stats import ttest_rel
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         final["reft"] = analyze_reft(dropout, dropfree)
 
     if (dropout / "ft").exists() and (dropfree / "ft").exists():
-        final["ft"] = analyze_reft(dropout, dropfree)
+        final["ft"] = analyze_ft(dropout, dropfree)
 
     if (dropout / "squad.json").exists() and (dropfree / "squad.json").exists():
         with open(dropfree / "squad.json", 'r') as d:
