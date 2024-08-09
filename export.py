@@ -43,6 +43,9 @@ if __name__ == "__main__":
     if (dropout / "reft").exists() and (dropfree / "reft").exists():
         final["reft"] = analyze_reft(dropout, dropfree)
 
+    if (dropout / "ft").exists() and (dropfree / "ft").exists():
+        final["ft"] = analyze_reft(dropout, dropfree)
+
     if (dropout / "consistency.csv").exists() and (dropfree / "consistency.csv").exists():
         df = pd.read_csv(str(dropout/"consistency.csv"))
         df.pred_tokens = df.pred_tokens.apply(lambda x:x.replace("Ġ", "").strip())
