@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", type=str, default="./data/")
 
     # bmask specific configs
-    parser.add_argument("--beta", type=float, default = 1e-5)
+    parser.add_argument("--beta", type=float, default = 1e-4)
 
     # squad specific setting
     parser.add_argument("--decay", type=float, default = 0.9)
