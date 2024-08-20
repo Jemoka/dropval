@@ -62,7 +62,7 @@ if __name__ == "__main__":
             for i in df.keys()
         }
 
-    if (dropout / "mend.json").exists() and (dropfree / "squad.json").exists():
+    if (dropout / "mend.json").exists() and (dropfree / "mend.json").exists():
         with open(dropfree / "mend.json", 'r') as d:
             df = json.load(d)
         df = {i.split("/")[-1]: j for i,j in df.items()}
