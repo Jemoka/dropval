@@ -113,7 +113,7 @@ if __name__ == "__main__":
                 "dropout": do_consistency,
                 "no_dropout": df_consistency
             },
-            "paired_increase_in_consistency_pairedt": {
+            "num_representations_df_minus_do_pairedt": {
                 "statistic": ttest_rel(repr_df, repr_do).statistic,
                 "pval": ttest_rel(repr_df, repr_do).pvalue,
             }
