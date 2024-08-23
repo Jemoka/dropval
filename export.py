@@ -41,10 +41,22 @@ if __name__ == "__main__":
         final["bmask"] = analyze_bmask(dropout, dropfree)
 
     if (dropout / "reft").exists() and (dropfree / "reft").exists():
-        final["reft"] = analyze_reft(dropout, dropfree)
+        try:
+            final["reft"] = analyze_reft(dropout, dropfree)
+        except Exception as e:
+            import warnings
+            warnings.warn(str(dropout)+"||"+str(dropfree))
+            warnings.warn(str(e))
 
     if (dropout / "ft").exists() and (dropfree / "ft").exists():
-        final["ft"] = analyze_ft(dropout, dropfree)
+        try:
+            final["ft"] = analyze_ft(dropout, dropfree)
+        except Exception as e:
+            import warnings
+            warnings.warn(str(dropout)+"||"+str(dropfree))
+            warnings.warn(str(e))
+
+
 
     if (dropout / "squad.json").exists() and (dropfree / "squad.json").exists():
         with open(dropfree / "squad.json", 'r') as d:
@@ -98,26 +110,33 @@ if __name__ == "__main__":
         }
 
     if (dropout / "consistency.csv").exists() and (dropfree / "consistency.csv").exists():
-        df = pd.read_csv(str(dropout/"consistency.csv"))
-        df.pred_tokens = df.pred_tokens.apply(lambda x:x.replace("Ġ", "").strip())
-        repr_do = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
-        do_consistency = mean_confidence_interval(repr_do)
 
-        df = pd.read_csv(str(dropfree/"consistency.csv"))
-        df.pred_tokens = df.pred_tokens.apply(lambda x:str(x).replace("Ġ", "").strip())
-        repr_df = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
-        df_consistency = mean_confidence_interval(repr_df)
+        try:
+            df = pd.read_csv(str(dropout/"consistency.csv"))
+            df.pred_tokens = df.pred_tokens.apply(lambda x:str(x).replace("Ġ", "").strip())
+            repr_do = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
+            do_consistency = mean_confidence_interval(repr_do)
 
-        final["consistency"] = {
-            "num_representations_p95": {
-                "dropout": do_consistency,
-                "no_dropout": df_consistency
-            },
-            "num_representations_df_minus_do_pairedt": {
-                "statistic": ttest_rel(repr_df, repr_do).statistic,
-                "pval": ttest_rel(repr_df, repr_do).pvalue,
+            df = pd.read_csv(str(dropfree/"consistency.csv"))
+            df.pred_tokens = df.pred_tokens.apply(lambda x:str(x).replace("Ġ", "").strip())
+            repr_df = df.groupby(["target", "pattern"]).pred_tokens.unique().apply(lambda x:len(x))
+            df_consistency = mean_confidence_interval(repr_df)
+
+            final["consistency"] = {
+                "num_representations_p95": {
+                    "dropout": do_consistency,
+                    "no_dropout": df_consistency
+                },
+                "num_representations_df_minus_do_pairedt": {
+                    "statistic": ttest_rel(repr_df, repr_do).statistic,
+                    "pval": ttest_rel(repr_df, repr_do).pvalue,
+                }
             }
-        }
+        except Exception as e:
+            import warnings
+            warnings.warn(str(dropout)+"||"+str(dropfree))
+            warnings.warn(str(e))
+
 
     with open(OUTPUT, 'w') as df:
         json.dump(final, df, indent=4)
