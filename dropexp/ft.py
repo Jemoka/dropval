@@ -17,7 +17,7 @@ def analyze_ft(dropout, dropfree):
 
     do_values = defaultdict(list)
     for item in sorted(glob(str(dropout / "ft" / "ft*json"))):
-        if not any([i in item for i in grouped_concepts]):
+        if not any([i == Path(item).stem for i in grouped_concepts]):
             continue
         with open(item, 'r') as df:
             data = json.load(df)
@@ -29,7 +29,7 @@ def analyze_ft(dropout, dropfree):
 
     df_values = defaultdict(list)
     for item in sorted(glob(str(dropfree / "ft" / "ft*json"))):
-        if not any([i in item for i in grouped_concepts]):
+        if not any([i == Path(item).stem for i in grouped_concepts]):
             continue
         with open(item, 'r') as df:
             data = json.load(df)
@@ -37,9 +37,6 @@ def analyze_ft(dropout, dropfree):
             df_values[k].append(v)
     df_values = dict(df_values)
     df_values_final = {}
-    for k,v in df_values.items():
-        df_values_final[k.split("/")[-1].strip()] = mean_confidence_interval(v)
-
 
     paired_final = {}
     for k,v in df_values.items():
