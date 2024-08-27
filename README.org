@@ -10,10 +10,9 @@ where =$TASK= is your choice of =bmask= (https://arxiv.org/abs/2010.02066),
 =mend= (https://arxiv.org/abs/2110.11309), =squad=
 (https://arxiv.org/abs/1606.05250), =consistency=
 (https://arxiv.org/pdf/2102.01017), or =kn=
-(https://arxiv.org/abs/2104.08696).
+(https://arxiv.org/abs/2104.08696), or =reft= (https://arxiv.org/pdf/2404.03592).
 
-Coming soon is also ReFT or LoRA.
-
+Coming soon is also LoRA.
 
 good vibes
 
