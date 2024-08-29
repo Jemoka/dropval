@@ -51,13 +51,16 @@ class ToyGenerator:
     @property
     def vocab_size(self):
         # because padding token 0 and mask token self._vocab_size+1
-        return self._vocab_size + 2
+        return self._vocab_size + 3
     @property
     def padding_token(self):
         return 0
     @property
     def mask_token(self):
         return self._vocab_size+1
+    @property
+    def enc_token(self):
+        return self._vocab_size+2
 
     @property
     def sequences(self):
@@ -69,7 +72,7 @@ class ToyGenerator:
         shuffle(seqs)
         seq_tokens = sum(seqs, [])
 
-        seq_length = randint(len(seq_tokens)+1, self.max_length)
+        seq_length = randint(len(seq_tokens)+1, self.max_length-2)
         missing = seq_length - len(seq_tokens)
 
         # double array because we will sum() it with seqs eventually
@@ -77,7 +80,7 @@ class ToyGenerator:
         shuffle(seq)
         seq = sum(seq, [])
 
-        return seq
+        return [self.enc_token]+seq+[self.enc_token]
 
     def stringify(self, ut):
         seq_stack = []
@@ -182,13 +185,15 @@ def collate(dat):
 
 
 class Trainer:
-    def __init__(self, epochs, batch_size, lr=1e-4, generator_args={}, device="cuda"):
+    def __init__(self, save_dir, epochs, batch_size, dropout_pct=0.1, lr=1e-4, generator_args={}, device="cuda"):
         self.device = device
+        self.save_dir = save_dir
 
         gen = ToyGenerator(**generator_args)
-        self.model = ToyModel(gen.vocab_size).to(self.device)
+        self.model = ToyModel(gen.vocab_size,
+                              dropout_pct=dropout_pct).to(self.device)
 
-        train = ToyDataset(100000, gen)
+        train = ToyDataset(500000, gen)
         self.train_dl = DataLoader(train, batch_size=batch_size, collate_fn=collate)
 
         dev = ToyDataset(4096, gen)
@@ -263,43 +268,6 @@ class Trainer:
                     if b > self.best_acc_:
                         print("BEST MODEL!")
                         self.best_acc_ = b
-                        torch.save(self, "models/best.pt")
+                        torch.save(self, self.save_dir)
 
-trainer = Trainer(5, 16)
-trainer.train()
-
-# trainer.model.device
-
-
-                
-# # output.logits.shape
-
-    
-#             # 
-
-# # output = model(**dat)
-# # output
-
-# # output.logits[-2]
-# # output.logits.shape
-# # dat["inputs"][-2]
-# # dat["labels"][-2]
-# # dat["attention_mask"][-2]
-
-
-# # # output
-
-# # # output.shape
-
-
-
-# # # model
-
-# # # # train = ToyDataset(100000, gen, mask_token=gen.vocab_size+1)
-# # dev = ToyDataset(10000, gen, mask_token=gen.vocab_size+1)
-# # # vocab_size = gen.vocab_size+1
-
-# # # # class ToyModel(/pr)
-
-
-
+                        
