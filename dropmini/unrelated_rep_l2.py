@@ -14,10 +14,18 @@ def mean_l2_distance(vecs):
     vecs_layer1 = [i[0].detach() for i in vecs]
     vecs_layer2 = [i[1].detach() for i in vecs]
 
-    l2_layer1 = ((vecs_layer1[0] - vecs_layer1[1])**2).sum().sqrt()
-    l2_layer2 = ((vecs_layer2[0] - vecs_layer2[1])**2).sum().sqrt()
+    l2_layer1 = []
+    l2_layer2 = []
 
-    return l2_layer1, l2_layer2
+    for i in range(len(vecs_layer1)):
+        for j in range(i+1, len(vecs_layer1)):
+            l2_layer1.append(((vecs_layer1[i] - vecs_layer1[j])**2).sum().sqrt())
+
+    for i in range(len(vecs_layer2)):
+        for j in range(i+1, len(vecs_layer2)):
+            l2_layer2.append(((vecs_layer2[i] - vecs_layer2[j])**2).sum().sqrt())
+
+    return sum(l2_layer1)/len(l2_layer1), sum(l2_layer2)/len(l2_layer2)
 
 checkpoint = torch.load("./models/dropout.pt")
 gen = checkpoint.generator
@@ -31,7 +39,19 @@ no_dropout_distances = []
 prefix = random.sample(gen.iid_tokens, 3)
 suffix = random.sample(gen.iid_tokens, 3)
 
-for seq_base in tqdm(gen.sequences):
+flattened_seq = sum(gen.sequences, [])
+seqs_grouped = defaultdict(list)
+for i in flattened_seq:
+    seqs_grouped[i[1]].append(i)
+seqs_grouped = dict(seqs_groped)
+
+# we only want one of each two pairs of values because
+# they are repeated permulations, which is tested by
+# inter_rep_l2.py
+unrelated_seqs = [[j for indx, j in enumerate(i) if indx % 2 == 1]
+                  for i in seqs_grouped.values()]
+
+for seq_base in tqdm(unrelated_seqs):
     # we need to register seperate hooks to write them to different arrays
     pre_proj_dropout = []
     def inspect_hook_proj_dropout(module, input, output):
@@ -69,7 +89,6 @@ for seq_base in tqdm(gen.sequences):
         dropout_correct = (res_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
         no_dropout_correct = (res_no_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
 
-        # dropout_emb= 
         do_l1, do_l2 = pre_proj_dropout
         dropout_embs = (do_l1.squeeze(1)[5], do_l2.squeeze(1)[5])
         df_l1, df_l2 = pre_proj_no_dropout
@@ -118,8 +137,8 @@ df_layer1["layer"] = 1
 df_layer2["layer"] = 2
 
 df = pd.concat([df_layer1, df_layer2])
-df.columns = ["intra-term l2", "model", "layer"]
+df.columns = ["inter-term l2", "model", "layer"]
 
-sns.boxplot(df, x="layer", y="intra-term l2", hue="model")
+sns.boxplot(df, x="layer", y="inter-term l2", hue="model")
 
 
