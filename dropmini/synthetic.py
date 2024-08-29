@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from pathlib import Path
+
 from torch.optim import Adam
 
 class ToyGenerator:
@@ -187,7 +189,7 @@ def collate(dat):
 class Trainer:
     def __init__(self, save_dir, epochs, batch_size, dropout_pct=0.1, lr=1e-4, generator_args={}, device="cuda"):
         self.device = device
-        self.save_dir = save_dir
+        self.save_dir = Path(save_dir)
 
         gen = ToyGenerator(**generator_args)
         self.model = ToyModel(gen.vocab_size,
@@ -263,11 +265,14 @@ class Trainer:
                 if indx % 24 == 0:
                     print(f"TRAIN | {indx}/{len(self.train_dl)-1} | LOSS {round(output.loss.item(), 3)}")
 
+                if indx % 5000 == 0:
+                    torch.save(self, str(self.save_dir/f"checkpoint_{indx}.pt"))
+
                 if indx % 1024 == 0:
                     a,b,c = self.val()
                     if b > self.best_acc_:
                         print("BEST MODEL!")
                         self.best_acc_ = b
-                        torch.save(self, self.save_dir)
+                        torch.save(self, str(self.save_dir/"best.pt"))
 
                         
