@@ -17,12 +17,12 @@ def mean_confidence_interval(data, confidence=0.95):
 df_reps = []
 df_unrs = []
 
-for i in [0, 5000, 10000, 15000, 20000, 25000, 30000]:
-    df_rep = analyze_rep_l2(f"./models/dropout/checkpoint_{i}.pt", f"./models/no_dropout/checkpoint_{i}.pt")
-    df_unr = analyze_unrelated_l2(f"./models/dropout/checkpoint_{i}.pt", f"./models/no_dropout/checkpoint_{i}.pt")
+for i in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
+    df_rep = analyze_rep_l2(f"./models/dropout_{i}/checkpoint_30000.pt", f"./models/no_dropout/checkpoint_30000.pt")
+    df_unr = analyze_unrelated_l2(f"./models/dropout_{i}/checkpoint_30000.pt", f"./models/no_dropout/checkpoint_30000.pt")
 
-    df_rep["checkpoint"] = i
-    df_unr["checkpoint"] = i
+    df_rep["do_pct"] = i
+    df_unr["do_pct"] = i
 
     df_reps.append(df_rep)
     df_unrs.append(df_unr)
@@ -32,15 +32,15 @@ df_unrs_concat = pd.concat(df_unrs)
 
 dat = []
 
-for i in df_reps_concat[["model","layer","checkpoint"]].value_counts().index:
+for i in df_reps_concat[["model","layer","do_pct"]].value_counts().index:
     itl = df_reps_concat[(df_reps_concat.model == i[0]) &
                          (df_reps_concat.layer == i[1]) &
-                         (df_reps_concat.checkpoint == i[2])].intra_term_l2
+                         (df_reps_concat.do_pct == i[2])].intra_term_l2
     a,b = mean_confidence_interval(itl)
     dat.append({
         "model": i[0].replace(" ", "_"),
         "layer": i[1],
-        "checkpoint": i[2],
+        "do_pct": i[2],
         "intra_term_l2": a,
         "intra_term_l2_min": a-b,
         "intra_term_l2_max": a+b,
@@ -51,23 +51,20 @@ for i in df_reps_concat[["model","layer","checkpoint"]].value_counts().index:
 
 dat = pd.DataFrame(dat)
 
-for i in df_unrs_concat[["model","layer","checkpoint"]].value_counts().index:
+for i in df_unrs_concat[["model","layer","do_pct"]].value_counts().index:
     itl = df_unrs_concat[(df_unrs_concat.model == i[0]) &
                          (df_unrs_concat.layer == i[1]) &
-                         (df_unrs_concat.checkpoint == i[2])].inter_term_l2
+                         (df_unrs_concat.do_pct == i[2])].inter_term_l2
     a,b = mean_confidence_interval(itl)
 
     index = ((dat.model == i[0].replace(" ", "_")) &
              (dat.layer == i[1]) &
-             (dat.checkpoint == i[2]))
+             (dat.do_pct == i[2]))
 
     dat.loc[index, "unrelated_term_l2"] = a
     dat.loc[index, "unrelated_term_l2_min"] = a-b
     dat.loc[index, "unrelated_term_l2_max"] = a+b
 
-dat.sort_values(by="checkpoint")[(dat.model=="dropout") & (dat.layer==1)].to_csv("./output/dropmini_dropout_l1.dat", sep=" ", index=False)
-dat.sort_values(by="checkpoint")[(dat.model=="no_dropout") & (dat.layer==1)].to_csv("./output/dropmini_no_dropout_l1.dat", sep=" ", index=False)
-
-dat.sort_values(by="checkpoint")[(dat.model=="dropout") & (dat.layer==2)].to_csv("./output/dropmini_dropout_l2.dat", sep=" ", index=False)
-dat.sort_values(by="checkpoint")[(dat.model=="no_dropout") & (dat.layer==2)].to_csv("./output/dropmini_no_dropout_l2.dat", sep=" ", index=False)
+dat.sort_values(by="do_pct")[(dat.model=="dropout") & (dat.layer==1)].to_csv("./output/dropmini_dropout_l1_pcts.dat", sep=" ", index=False)
+dat.sort_values(by="do_pct")[(dat.model=="dropout") & (dat.layer==2)].to_csv("./output/dropmini_dropout_l2_pcts.dat", sep=" ", index=False)
 
