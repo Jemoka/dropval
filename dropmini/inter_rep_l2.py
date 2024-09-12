@@ -25,11 +25,11 @@ pre_proj_no_dropout = []
 def analyze_rep_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoint="./models/no_dropout.pt"):
     global pre_proj_dropout, pre_proj_no_dropout
 
-    checkpoint = torch.load("./models/dropout.pt")
+    checkpoint = torch.load(dropout_checkpoint)
     gen = checkpoint.generator
 
-    dropout_model = checkpoint.model
-    no_dropout_model = torch.load("./models/no_dropout.pt").model
+    dropout_model = checkpoint.model.eval()
+    no_dropout_model = torch.load(no_dropout_checkpoint).model.eval()
 
     dropout_distances = []
     no_dropout_distances = []
@@ -131,3 +131,4 @@ def analyze_rep_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoi
 if __name__ == "__main__":
     df = analyze_rep_l2("./models/dropout/best.pt", "./models/no_dropout/best.pt")
     sns.boxplot(df, x="layer", y="intra_term_l2", hue="model")
+

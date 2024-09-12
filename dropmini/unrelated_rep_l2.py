@@ -36,8 +36,8 @@ def analyze_unrelated_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_ch
     checkpoint = torch.load(dropout_checkpoint)
     gen = checkpoint.generator
 
-    dropout_model = checkpoint.model
-    no_dropout_model = torch.load(no_dropout_checkpoint).model
+    dropout_model = checkpoint.model.eval()
+    no_dropout_model = torch.load(no_dropout_checkpoint).model.eval()
 
     dropout_distances = []
     no_dropout_distances = []

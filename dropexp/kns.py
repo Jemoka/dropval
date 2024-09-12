@@ -4,6 +4,8 @@ from glob import glob
 import json
 from scipy.stats import ttest_rel
 
+from tqdm import tqdm
+
 from dropexp.utils import mean_confidence_interval, ks
 
 def analyze_kns(dropout, dropfree):
@@ -11,6 +13,7 @@ def analyze_kns(dropout, dropfree):
     concepts_c = set([Path(i).stem for i in glob(str(dropfree / "kns" / "*_intervene.csv"))])
 
     grouped_concepts = list(concepts_a.intersection(concepts_c))
+    grouped_concepts = [str(j) for j in grouped_concepts]
 
     dropout_cluster_counts = []
 
@@ -32,7 +35,7 @@ def analyze_kns(dropout, dropfree):
 
 
     concepts = glob(str(dropout / "kns" / "*_intervene.csv"))
-    for i in sorted(concepts):
+    for i in tqdm(sorted(concepts)):
         df = pd.read_csv(i)
         a,b,c,d = compute_kn_means(df)
         dropout_intervene_match_augment.append(a)
@@ -40,11 +43,12 @@ def analyze_kns(dropout, dropfree):
         dropout_intervene_no_match_augment.append(c)
         dropout_intervene_no_match_suppress.append(d)
 
-        if any([j == Path(i).stem for j in grouped_concepts]):
+
+        if str(Path(i).stem) in grouped_concepts:
             dropout_cluster_counts.append(len(df.knowledge_cluster.value_counts()))
 
     concepts = glob(str(dropout / "kns" / "*_baseline.csv"))
-    for i in sorted(concepts):
+    for i in tqdm(sorted(concepts)):
         df = pd.read_csv(i)
         a,b,c,d = compute_kn_means(df)
         dropout_baseline_match_augment.append(a)
@@ -71,7 +75,7 @@ def analyze_kns(dropout, dropfree):
         return augment.loc[True], suppress.loc[True], augment.loc[False], suppress.loc[False]
 
     concepts = glob(str(dropfree / "kns" / "*_intervene.csv"))
-    for i in sorted(concepts):
+    for i in tqdm(sorted(concepts)):
 
         df = pd.read_csv(i)
         a,b,c,d = compute_kn_means(df)
@@ -80,11 +84,11 @@ def analyze_kns(dropout, dropfree):
         dropfree_intervene_no_match_augment.append(c)
         dropfree_intervene_no_match_suppress.append(d)
 
-        if any([j == Path(i).stem for j in grouped_concepts]):
+        if str(Path(i).stem) in grouped_concepts:
             dropfree_cluster_counts.append(len(df.knowledge_cluster.value_counts()))
 
     concepts = glob(str(dropfree / "kns" / "*_baseline.csv"))
-    for i in sorted(concepts):
+    for i in tqdm(sorted(concepts)):
         df = pd.read_csv(i)
         a,b,c,d = compute_kn_means(df)
         dropfree_baseline_match_augment.append(a)

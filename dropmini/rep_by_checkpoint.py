@@ -4,6 +4,9 @@ from unrelated_rep_l2 import analyze_unrelated_l2
 import numpy as np
 import scipy.stats
 
+import pandas as pd
+
+
 def mean_confidence_interval(data, confidence=0.95):
     a = 1.0 * np.array(data)
     n = len(a)
@@ -62,6 +65,9 @@ for i in df_unrs_concat[["model","layer","checkpoint"]].value_counts().index:
     dat.loc[index, "unrelated_term_l2_min"] = a-b
     dat.loc[index, "unrelated_term_l2_max"] = a+b
 
-dat.to_csv("dropmini.dat", sep=" ", index=False)
+dat.sort_values(by="checkpoint")[(dat.model=="dropout") & (dat.layer==1)].to_csv("./output/dropmini_dropout_l1.dat", sep=" ", index=False)
+dat.sort_values(by="checkpoint")[(dat.model=="no_dropout") & (dat.layer==1)].to_csv("./output/dropmini_no_dropout_l1.dat", sep=" ", index=False)
 
+dat.sort_values(by="checkpoint")[(dat.model=="dropout") & (dat.layer==2)].to_csv("./output/dropmini_dropout_l2.dat", sep=" ", index=False)
+dat.sort_values(by="checkpoint")[(dat.model=="no_dropout") & (dat.layer==2)].to_csv("./output/dropmini_no_dropout_l2.dat", sep=" ", index=False)
 
