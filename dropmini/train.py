@@ -1,13 +1,11 @@
-from synthetic import *
+from synthetic import Trainer
 
-trainer = Trainer("models/dropout", 1, 16, dropout_pct=0.1)
-trainer.train()
+base = Trainer("models/no_dropout", 1, 16, dropout_pct=0)
+base.train()
 
-trainer2 = Trainer("models/no_dropout", 1, 16, dropout_pct=0)
-trainer2.train_dl = trainer.train_dl
-trainer2.dev_dl = trainer.dev_dl
-trainer2.train()
-
-
-
-
+for dropout_amount in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
+    alt = Trainer(f"models/dropout_{dropout_amount}", 1, 16,
+                  dropout_pct=dropout_amount)
+    alt.train_dl = base.train_dl
+    alt.dev_dl = base.dev_dl
+    alt.train()
