@@ -18,8 +18,8 @@ df_reps = []
 df_unrs = []
 
 for i in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
-    df_rep = analyze_rep_l2(f"./models/dropout_{i}/checkpoint_30000.pt", f"./models/no_dropout/checkpoint_30000.pt")
-    df_unr = analyze_unrelated_l2(f"./models/dropout_{i}/checkpoint_30000.pt", f"./models/no_dropout/checkpoint_30000.pt")
+    df_rep = analyze_rep_l2(f"./models/dropout_{i}/best.pt", f"./models/no_dropout/best.pt")
+    df_unr = analyze_unrelated_l2(f"./models/dropout_{i}/best.pt", f"./models/no_dropout/best.pt")
 
     df_rep["do_pct"] = i
     df_unr["do_pct"] = i

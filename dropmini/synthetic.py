@@ -268,11 +268,17 @@ class Trainer:
                 if indx % 5000 == 0:
                     torch.save(self, str(self.save_dir/f"checkpoint_{indx}.pt"))
 
-                if indx % 1024 == 0:
+                if indx % 8192 == 0:
                     a,b,c = self.val()
                     if b > self.best_acc_:
                         print("BEST MODEL!")
                         self.best_acc_ = b
                         torch.save(self, str(self.save_dir/"best.pt"))
 
-                        
+        a,b,c = self.val()
+        if b > self.best_acc_:
+            print("BEST MODEL!")
+            self.best_acc_ = b
+            torch.save(self, str(self.save_dir/"best.pt"))
+
+           
