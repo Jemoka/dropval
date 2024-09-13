@@ -18,8 +18,8 @@ df_reps = []
 df_unrs = []
 
 for i in [0, 5000, 10000, 15000, 20000, 25000, 30000]:
-    df_rep = analyze_rep_l2(f"./models/dropout/checkpoint_{i}.pt", f"./models/no_dropout/checkpoint_{i}.pt")
-    df_unr = analyze_unrelated_l2(f"./models/dropout/checkpoint_{i}.pt", f"./models/no_dropout/checkpoint_{i}.pt")
+    df_rep = analyze_rep_l2(f"./models/seed_1/dropout_0.1/checkpoint_{i}.pt", f"./models/seed_1/no_dropout/checkpoint_{i}.pt")
+    df_unr = analyze_unrelated_l2(f"./models/seed_1/dropout_0.1/checkpoint_{i}.pt", f"./models/seed_1/no_dropout/checkpoint_{i}.pt")
 
     df_rep["checkpoint"] = i
     df_unr["checkpoint"] = i
