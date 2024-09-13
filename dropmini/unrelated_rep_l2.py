@@ -30,7 +30,7 @@ def mean_l2_distance(vecs):
 pre_proj_dropout = []
 pre_proj_no_dropout = []
 
-def analyze_unrelated_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoint="./models/no_dropout.pt"):
+def analyze_unrelated_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoint="./models/no_dropout.pt", attempts=100):
     global pre_proj_dropout, pre_proj_no_dropout
 
     checkpoint = torch.load(dropout_checkpoint)
@@ -42,78 +42,80 @@ def analyze_unrelated_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_ch
     dropout_distances = []
     no_dropout_distances = []
 
-    prefix = random.sample(gen.iid_tokens, 3)
-    suffix = random.sample(gen.iid_tokens, 3)
+    for _ in tqdm(range(attempts)):
 
-    flattened_seq = sum(gen.sequences, [])
-    seqs_grouped = defaultdict(list)
-    for i in flattened_seq:
-        seqs_grouped[i[1]].append(i)
-    seqs_grouped = dict(seqs_grouped)
+        prefix = random.sample(gen.iid_tokens, 3)
+        suffix = random.sample(gen.iid_tokens, 3)
 
-    # we only want one of each two pairs of values because
-    # they are repeated permulations, which is tested by
-    # inter_rep_l2.py
-    unrelated_seqs = [[j for indx, j in enumerate(i) if indx % 2 == 1]
-                    for i in seqs_grouped.values()]
+        flattened_seq = sum(gen.sequences, [])
+        seqs_grouped = defaultdict(list)
+        for i in flattened_seq:
+            seqs_grouped[i[1]].append(i)
+        seqs_grouped = dict(seqs_grouped)
 
-    for seq_base in tqdm(unrelated_seqs):
-        if len(seq_base) < 2:
-            continue
-        # we need to register seperate hooks to write them to different arrays
-        def inspect_hook_proj_dropout(module, input, output):
-            global pre_proj_dropout
-            pre_proj_dropout.append(input[0])
-            return output
-        remove_hooks_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_dropout)
-                                for i in dropout_model.encoder.layers]
-        def inspect_hook_proj_no_dropout(module, input, output):
-            global pre_proj_no_dropout
-            pre_proj_no_dropout.append(input[0])
-            return output
-        remove_hooks_no_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_no_dropout)
-                                for i in no_dropout_model.encoder.layers]
+        # we only want one of each two pairs of values because
+        # they are repeated permulations, which is tested by
+        # inter_rep_l2.py
+        unrelated_seqs = [[j for indx, j in enumerate(i) if indx % 2 == 1]
+                        for i in seqs_grouped.values()]
 
-        collected_activations_dropout = defaultdict(list)
-        collected_activations_no_dropout = defaultdict(list)
+        for seq_base in tqdm(unrelated_seqs):
+            if len(seq_base) < 2:
+                continue
+            # we need to register seperate hooks to write them to different arrays
+            def inspect_hook_proj_dropout(module, input, output):
+                global pre_proj_dropout
+                pre_proj_dropout.append(input[0])
+                return output
+            remove_hooks_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_dropout)
+                                    for i in dropout_model.encoder.layers]
+            def inspect_hook_proj_no_dropout(module, input, output):
+                global pre_proj_no_dropout
+                pre_proj_no_dropout.append(input[0])
+                return output
+            remove_hooks_no_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_no_dropout)
+                                    for i in no_dropout_model.encoder.layers]
 
-        # we want to test different preturbations of this seq_base
-        for seq in seq_base:
-            pre_proj_dropout = []
-            pre_proj_no_dropout = []
+            collected_activations_dropout = defaultdict(list)
+            collected_activations_no_dropout = defaultdict(list)
 
-            seq = list(seq)
-            seq = torch.tensor([gen.enc_token] + prefix + seq + suffix + [gen.enc_token]).unsqueeze(0).cuda()
+            # we want to test different preturbations of this seq_base
+            for seq in seq_base:
+                pre_proj_dropout = []
+                pre_proj_no_dropout = []
 
-            # and this will also be the token whose embedding we care about
-            label_token = seq[0][5].cpu().detach().item()
-            seq[0][5] = gen.mask_token
+                seq = list(seq)
+                seq = torch.tensor([gen.enc_token] + prefix + seq + suffix + [gen.enc_token]).unsqueeze(0).cuda()
 
-            res_dropout = dropout_model(seq, ~torch.ones_like(seq).bool())
-            res_no_dropout = no_dropout_model(seq, ~torch.ones_like(seq).bool())
+                # and this will also be the token whose embedding we care about
+                label_token = seq[0][5].cpu().detach().item()
+                seq[0][5] = gen.mask_token
 
-            dropout_correct = (res_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
-            no_dropout_correct = (res_no_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
+                res_dropout = dropout_model(seq, ~torch.ones_like(seq).bool())
+                res_no_dropout = no_dropout_model(seq, ~torch.ones_like(seq).bool())
 
-            do_l1, do_l2 = pre_proj_dropout
-            dropout_embs = (do_l1.squeeze(1)[5], do_l2.squeeze(1)[5])
-            df_l1, df_l2 = pre_proj_no_dropout
-            no_dropout_embs = (df_l1.squeeze(1)[5], df_l2.squeeze(1)[5])
+                dropout_correct = (res_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
+                no_dropout_correct = (res_no_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
 
-            collected_activations_dropout[label_token].append(dropout_embs)
-            collected_activations_no_dropout[label_token].append(no_dropout_embs)
+                do_l1, do_l2 = pre_proj_dropout
+                dropout_embs = (do_l1.squeeze(1)[5], do_l2.squeeze(1)[5])
+                df_l1, df_l2 = pre_proj_no_dropout
+                no_dropout_embs = (df_l1.squeeze(1)[5], df_l2.squeeze(1)[5])
 
-        [i.remove() for i in remove_hooks_dropout]
-        [i.remove() for i in remove_hooks_no_dropout]
+                collected_activations_dropout[label_token].append(dropout_embs)
+                collected_activations_no_dropout[label_token].append(no_dropout_embs)
 
-        collected_activations_dropout = dict(collected_activations_dropout)
-        collected_activations_no_dropout = dict(collected_activations_no_dropout)
+            [i.remove() for i in remove_hooks_dropout]
+            [i.remove() for i in remove_hooks_no_dropout]
 
-        mean_distance_dropout = [mean_l2_distance(i) for i in collected_activations_dropout.values()]
-        mean_distance_no_dropout = [mean_l2_distance(i) for i in collected_activations_no_dropout.values()]
+            collected_activations_dropout = dict(collected_activations_dropout)
+            collected_activations_no_dropout = dict(collected_activations_no_dropout)
 
-        dropout_distances.append(mean_distance_dropout)
-        no_dropout_distances.append(mean_distance_no_dropout)
+            mean_distance_dropout = [mean_l2_distance(i) for i in collected_activations_dropout.values()]
+            mean_distance_no_dropout = [mean_l2_distance(i) for i in collected_activations_no_dropout.values()]
+
+            dropout_distances.append(mean_distance_dropout)
+            no_dropout_distances.append(mean_distance_no_dropout)
 
     dropout_distances_layer1 = torch.stack([j[0] for i in dropout_distances for j in i])
     dropout_distances_layer2 = torch.stack([j[1] for i in dropout_distances for j in i])

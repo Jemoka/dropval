@@ -22,7 +22,7 @@ def mean_l2_distance(vecs):
 pre_proj_dropout = []
 pre_proj_no_dropout = []
 
-def analyze_rep_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoint="./models/no_dropout.pt"):
+def analyze_rep_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoint="./models/no_dropout.pt", attempts=100):
     global pre_proj_dropout, pre_proj_no_dropout
 
     checkpoint = torch.load(dropout_checkpoint)
@@ -34,67 +34,69 @@ def analyze_rep_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoi
     dropout_distances = []
     no_dropout_distances = []
 
-    prefix = random.sample(gen.iid_tokens, 3)
-    suffix = random.sample(gen.iid_tokens, 3)
+    for _ in tqdm(range(attempts)):
 
-    for seq_base in tqdm(gen.sequences):
-        # we need to register seperate hooks to write them to different arrays
-        pre_proj_dropout = []
-        def inspect_hook_proj_dropout(module, input, output):
-            global pre_proj_dropout
-            pre_proj_dropout.append(input[0])
-            return output
-        remove_hooks_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_dropout)
-                                for i in dropout_model.encoder.layers]
-        pre_proj_no_dropout = []
-        def inspect_hook_proj_no_dropout(module, input, output):
-            global pre_proj_no_dropout
-            pre_proj_no_dropout.append(input[0])
-            return output
-        remove_hooks_no_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_no_dropout)
-                                for i in no_dropout_model.encoder.layers]
+        prefix = random.sample(gen.iid_tokens, 3)
+        suffix = random.sample(gen.iid_tokens, 3)
 
-        collected_activations_dropout = defaultdict(list)
-        collected_activations_no_dropout = defaultdict(list)
-
-        # we want to test different preturbations of this seq_base
-        for seq in seq_base:
+        for seq_base in gen.sequences:
+            # we need to register seperate hooks to write them to different arrays
             pre_proj_dropout = []
+            def inspect_hook_proj_dropout(module, input, output):
+                global pre_proj_dropout
+                pre_proj_dropout.append(input[0])
+                return output
+            remove_hooks_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_dropout)
+                                    for i in dropout_model.encoder.layers]
             pre_proj_no_dropout = []
+            def inspect_hook_proj_no_dropout(module, input, output):
+                global pre_proj_no_dropout
+                pre_proj_no_dropout.append(input[0])
+                return output
+            remove_hooks_no_dropout = [i.linear2.register_forward_hook(inspect_hook_proj_no_dropout)
+                                    for i in no_dropout_model.encoder.layers]
 
-            seq = list(seq)
-            seq = torch.tensor([gen.enc_token] + prefix + seq + suffix + [gen.enc_token]).unsqueeze(0).cuda()
+            collected_activations_dropout = defaultdict(list)
+            collected_activations_no_dropout = defaultdict(list)
 
-            # and this will also be the token whose embedding we care about
-            label_token = seq[0][5].cpu().detach().item()
-            seq[0][5] = gen.mask_token
+            # we want to test different preturbations of this seq_base
+            for seq in seq_base:
+                pre_proj_dropout = []
+                pre_proj_no_dropout = []
 
-            res_dropout = dropout_model(seq, ~torch.ones_like(seq).bool())
-            res_no_dropout = no_dropout_model(seq, ~torch.ones_like(seq).bool())
+                seq = list(seq)
+                seq = torch.tensor([gen.enc_token] + prefix + seq + suffix + [gen.enc_token]).unsqueeze(0).cuda()
 
-            dropout_correct = (res_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
-            no_dropout_correct = (res_no_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
+                # and this will also be the token whose embedding we care about
+                label_token = seq[0][5].cpu().detach().item()
+                seq[0][5] = gen.mask_token
 
-            # dropout_emb= 
-            do_l1, do_l2 = pre_proj_dropout
-            dropout_embs = (do_l1.squeeze(1)[5], do_l2.squeeze(1)[5])
-            df_l1, df_l2 = pre_proj_no_dropout
-            no_dropout_embs = (df_l1.squeeze(1)[5], df_l2.squeeze(1)[5])
+                res_dropout = dropout_model(seq, ~torch.ones_like(seq).bool())
+                res_no_dropout = no_dropout_model(seq, ~torch.ones_like(seq).bool())
 
-            collected_activations_dropout[label_token].append(dropout_embs)
-            collected_activations_no_dropout[label_token].append(no_dropout_embs)
+                dropout_correct = (res_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
+                no_dropout_correct = (res_no_dropout.logits.argmax(dim=-1)[0][5] == label_token).float()
 
-        [i.remove() for i in remove_hooks_dropout]
-        [i.remove() for i in remove_hooks_no_dropout]
+                # dropout_emb= 
+                do_l1, do_l2 = pre_proj_dropout
+                dropout_embs = (do_l1.squeeze(1)[5], do_l2.squeeze(1)[5])
+                df_l1, df_l2 = pre_proj_no_dropout
+                no_dropout_embs = (df_l1.squeeze(1)[5], df_l2.squeeze(1)[5])
 
-        collected_activations_dropout = dict(collected_activations_dropout)
-        collected_activations_no_dropout = dict(collected_activations_no_dropout)
+                collected_activations_dropout[label_token].append(dropout_embs)
+                collected_activations_no_dropout[label_token].append(no_dropout_embs)
 
-        mean_distance_dropout = [mean_l2_distance(i) for i in collected_activations_dropout.values()]
-        mean_distance_no_dropout = [mean_l2_distance(i) for i in collected_activations_no_dropout.values()]
+            [i.remove() for i in remove_hooks_dropout]
+            [i.remove() for i in remove_hooks_no_dropout]
 
-        dropout_distances.append(mean_distance_dropout)
-        no_dropout_distances.append(mean_distance_no_dropout)
+            collected_activations_dropout = dict(collected_activations_dropout)
+            collected_activations_no_dropout = dict(collected_activations_no_dropout)
+
+            mean_distance_dropout = [mean_l2_distance(i) for i in collected_activations_dropout.values()]
+            mean_distance_no_dropout = [mean_l2_distance(i) for i in collected_activations_no_dropout.values()]
+
+            dropout_distances.append(mean_distance_dropout)
+            no_dropout_distances.append(mean_distance_no_dropout)
 
     dropout_distances_layer1 = torch.stack([j[0] for i in dropout_distances for j in i])
     dropout_distances_layer2 = torch.stack([j[1] for i in dropout_distances for j in i])
@@ -129,6 +131,6 @@ def analyze_rep_l2(dropout_checkpoint="./models/dropout.pt", no_dropout_checkpoi
     return df
 
 if __name__ == "__main__":
-    df = analyze_rep_l2("./models/dropout/best.pt", "./models/no_dropout/best.pt")
+    df = analyze_rep_l2("./models/seed_1/dropout_0.3/best.pt", "./models/seed_1/no_dropout/best.pt")
     sns.boxplot(df, x="layer", y="intra_term_l2", hue="model")
 
